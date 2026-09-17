@@ -1,33 +1,77 @@
 /**
  * The draw path: mesh binding, batching, projection and the sky pass.
+ *
+ * `draw()` keeps the signature it has always had, because several hundred call sites
+ * across the simulation and HUD depend on it. What changed underneath is that it now
+ * serves two passes — the lit scene and the depth-only shadow cascades — selected by
+ * `pass.mode`. Callers draw the world once and the renderer replays it per cascade.
  */
 import { G } from '../sim/state.js';
 import { M, dot, hex, norm } from './math.js';
 import { camera } from './viewport.js';
 import { geo, upload } from './mesh.js';
 import { gl } from './gl.js';
-import { prg, skyBuffer, skyPrg } from './programs.js';
+import { scenePrg, shadowPrg, skyPrg, quadVao } from './programs.js';
+import { MATERIAL, SUN_DIR, SUN_COLOR, MOON_DIR } from './lighting.js';
 
-let currentBuffer = null;
+let currentVao = null;
+
+/** The program `draw()` is currently feeding. Swapped by the pass, not by call sites. */
+let activePrg = scenePrg;
 
 /**
- * Flags for the render pass in flight: enhanced-imaging mode and wireframe tint.
+ * State for the render pass in flight.
+ *
+ * `material` is a per-draw surface description rather than a texture, because the geometry
+ * carries no texture coordinates — see `MATERIAL` in lighting.js. Call sites set it before
+ * a group of draws and it persists until changed, like any other GL state.
  */
 export const pass = {
   imagingPass: false,
   wireTint: [0.18, 0.7, 0.43],
+  /** 'scene' or 'shadow'. */
+  mode: 'scene',
+  material: MATERIAL.terrain,
+  /** Set while rendering a cascade, so `draw` can skip anything that must not cast. */
+  cascade: 0,
 };
 
-function bindMesh(buffer) {
-  if (currentBuffer === buffer) return;
-  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-  for (const a of [prg.aPos, prg.aNormal, prg.aColor]) gl.enableVertexAttribArray(a);
-  gl.vertexAttribPointer(prg.aPos, 3, gl.FLOAT, false, 36, 0);
-  gl.vertexAttribPointer(prg.aNormal, 3, gl.FLOAT, false, 36, 12);
-  gl.vertexAttribPointer(prg.aColor, 3, gl.FLOAT, false, 36, 24);
-  currentBuffer = buffer;
+/** Convenience for call sites: `withMaterial(MATERIAL.armor, () => { ... })`. */
+export function setMaterial(material) {
+  pass.material = material;
 }
 
+/**
+ * A vertex array object per mesh, built on first use.
+ *
+ * Attribute locations are pinned in programs.js, so the same VAO is valid for the scene
+ * and shadow programs and no re-specification is needed when the pass changes.
+ */
+function meshVao(g, buffer) {
+  if (g.vao && g.vaoBuffer === buffer) return g.vao;
+  const vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.enableVertexAttribArray(0);
+  gl.enableVertexAttribArray(1);
+  gl.enableVertexAttribArray(2);
+  gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 36, 0);
+  gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 36, 12);
+  gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 36, 24);
+  gl.bindVertexArray(null);
+  g.vao = vao;
+  g.vaoBuffer = buffer;
+  return vao;
+}
+
+function bindMesh(g, buffer) {
+  const vao = meshVao(g, buffer);
+  if (currentVao === vao) return;
+  gl.bindVertexArray(vao);
+  currentVao = vao;
+}
+
+/** Edge list for Enhanced Imaging, built lazily and cached on the mesh. */
 function edgeBuffer(g) {
   if (g.edges) return g.edges;
   const d = g.data,
@@ -57,39 +101,85 @@ function edgeBuffer(g) {
   const b = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, b);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(out), gl.STATIC_DRAW);
-  currentBuffer = null;
-  g.edges = { b, count: out.length / 9 };
+  currentVao = null;
+  gl.bindVertexArray(null);
+  g.edges = { b, count: out.length / 9, data: out };
   return g.edges;
 }
 
 export function releaseMesh(g) {
   gl.deleteBuffer(g.b);
-  if (g.edges) gl.deleteBuffer(g.edges.b);
+  if (g.vao) gl.deleteVertexArray(g.vao);
+  if (g.edges) {
+    gl.deleteBuffer(g.edges.b);
+    if (g.edges.vao) gl.deleteVertexArray(g.edges.vao);
+  }
 }
 
+const normalMatrix = new Float32Array(9);
+
+/**
+ * An uploaded mesh: a GPU buffer, its vertex count, and the interleaved source data kept
+ * for baking and for building the Enhanced Imaging edge list.
+ *
+ * @typedef {{
+ *   b: WebGLBuffer,
+ *   count: number,
+ *   data: number[],
+ *   grid?: boolean,
+ *   vao?: WebGLVertexArrayObject,
+ *   vaoBuffer?: WebGLBuffer,
+ *   edges?: any,
+ * }} Mesh
+ */
+
+/**
+ * Draw one mesh.
+ *
+ * @param {Mesh|null|undefined} g
+ * @param {Float32Array} m model matrix
+ * @param {number[]} [color]
+ * @param {number} [alpha]
+ * @param {number} [glow]  0 lit, 1 fully emissive
+ */
 export function draw(g, m, color = [1, 1, 1], alpha = 1, glow = 0) {
   if (!g || !g.count) return;
-  gl.uniformMatrix4fv(prg.uModel, false, m);
-  gl.uniform3fv(prg.uColor, color);
-  gl.uniform1f(prg.uAlpha, alpha);
-  gl.uniform1f(prg.uGlow, glow);
+
+  if (pass.mode === 'shadow') {
+    // Only opaque, non-emissive geometry casts. A tracer or a smoke puff casting a hard
+    // shadow reads as a bug, and the alpha test would have to happen per fragment anyway.
+    if (alpha < 0.95 || glow > 0.5) return;
+    bindMesh(g, g.b);
+    gl.uniformMatrix4fv(shadowPrg.uModel, false, m);
+    gl.drawArrays(gl.TRIANGLES, 0, g.count);
+    return;
+  }
+
+  gl.uniformMatrix4fv(scenePrg.uModel, false, m);
+  normalMatrix.set(M.normalMatrix(m));
+  gl.uniformMatrix3fv(scenePrg.uNormalMatrix, false, normalMatrix);
+  gl.uniform3fv(scenePrg.uColor, color);
+  gl.uniform1f(scenePrg.uAlpha, alpha);
+  gl.uniform1f(scenePrg.uGlow, glow);
+  gl.uniform4fv(scenePrg.uMaterial, pass.material);
+
   if (pass.imagingPass) {
     if (alpha > 0.5) {
-      bindMesh(g.b);
-      gl.uniform1f(prg.uImaging, 1);
+      bindMesh(g, g.b);
+      gl.uniform1f(scenePrg.uImaging, 1);
       gl.enable(gl.POLYGON_OFFSET_FILL);
       gl.polygonOffset(1, 1);
       gl.drawArrays(gl.TRIANGLES, 0, g.count);
       gl.disable(gl.POLYGON_OFFSET_FILL);
     }
     const e = edgeBuffer(g);
-    bindMesh(e.b);
-    gl.uniform1f(prg.uImaging, 2);
-    gl.uniform3fv(prg.uWireColor, pass.wireTint);
+    bindMesh(e, e.b);
+    gl.uniform1f(scenePrg.uImaging, 2);
+    gl.uniform3fv(scenePrg.uWireColor, pass.wireTint);
     gl.drawArrays(gl.LINES, 0, e.count);
   } else {
-    bindMesh(g.b);
-    gl.uniform1f(prg.uImaging, 0);
+    bindMesh(g, g.b);
+    gl.uniform1f(scenePrg.uImaging, 0);
     gl.drawArrays(gl.TRIANGLES, 0, g.count);
   }
 }
@@ -149,30 +239,101 @@ export function project(p) {
   };
 }
 
+/**
+ * Blending helpers that know which pass is running.
+ *
+ * Glow, particles, beams and holographic markers all need blending, and the code that
+ * draws them is interleaved with the solid geometry the shadow cascades also traverse.
+ * A raw `gl.depthMask(false)` in the middle of that would silently stop a cascade writing
+ * depth for everything after it. These no-op during the shadow pass instead, so the same
+ * draw code can serve both without a caller having to remember which one it is in.
+ */
+export function blendAdditive() {
+  if (pass.mode === 'shadow') return;
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+  gl.depthMask(false);
+}
+
+export function blendAlpha() {
+  if (pass.mode === 'shadow') return;
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  gl.depthMask(false);
+}
+
+/** Switch blend equation without touching the depth mask. */
+export function blendMode(mode) {
+  if (pass.mode === 'shadow') return;
+  gl.blendFunc(gl.SRC_ALPHA, mode === 'add' ? gl.ONE : gl.ONE_MINUS_SRC_ALPHA);
+}
+
+export function blendEnd() {
+  if (pass.mode === 'shadow') return;
+  gl.depthMask(true);
+  gl.disable(gl.BLEND);
+}
+
+/** Switch the renderer into depth-only cascade rendering. */
+export function beginShadowPass(lightMatrix) {
+  pass.mode = 'shadow';
+  activePrg = shadowPrg;
+  currentVao = null;
+  gl.useProgram(shadowPrg.p);
+  gl.uniformMatrix4fv(shadowPrg.uLightVP, false, lightMatrix);
+  // Front-face culling during the depth pass pushes acne to surfaces the camera cannot
+  // see, which removes most of it without needing an aggressive depth bias.
+  gl.enable(gl.CULL_FACE);
+  gl.cullFace(gl.FRONT);
+  gl.disable(gl.BLEND);
+  gl.depthMask(true);
+  gl.enable(gl.DEPTH_TEST);
+}
+
+export function endShadowPass() {
+  pass.mode = 'scene';
+  activePrg = scenePrg;
+  currentVao = null;
+  gl.disable(gl.CULL_FACE);
+  gl.cullFace(gl.BACK);
+}
+
+/**
+ * Draw the sky, then set up the scene program for the frame.
+ *
+ * Called once, after the shadow cascades are filled and the HDR target is bound.
+ */
 export function renderSky() {
   gl.disable(gl.DEPTH_TEST);
   gl.disable(gl.BLEND);
   gl.useProgram(skyPrg.p);
-  gl.bindBuffer(gl.ARRAY_BUFFER, skyBuffer);
-  for (let i = 0; i < 3; i++) gl.disableVertexAttribArray(i);
-  gl.enableVertexAttribArray(skyPrg.aPos);
-  gl.vertexAttribPointer(skyPrg.aPos, 2, gl.FLOAT, false, 0, 0);
+  gl.bindVertexArray(quadVao);
+  currentVao = null;
+
   gl.uniform3fv(skyPrg.uForward, camera.cameraForward);
   gl.uniform3fv(skyPrg.uRight, camera.cameraRight);
   gl.uniform3fv(skyPrg.uUp, camera.cameraUp);
   gl.uniform1f(skyPrg.uAspect, camera.screenW / camera.screenH);
   gl.uniform1f(skyPrg.uFov, Math.tan(camera.fov / 2));
   gl.uniform1f(skyPrg.uOffset, G.state === 'menu' ? 0 : -0.14);
+  gl.uniform3fv(skyPrg.uSunDir, SUN_DIR);
+  gl.uniform3fv(skyPrg.uSunColor, SUN_COLOR);
+  gl.uniform3fv(skyPrg.uMoonDir, MOON_DIR);
+  gl.uniform1f(skyPrg.uExposure, 1);
+  gl.uniform1f(skyPrg.uTime, G.realTime);
   gl.uniform1f(skyPrg.uNight, G.player?.vision ? 1 : 0);
   gl.uniform1f(skyPrg.uImaging, pass.imagingPass ? 1 : 0);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+  gl.bindVertexArray(null);
   gl.enable(gl.DEPTH_TEST);
   gl.clear(gl.DEPTH_BUFFER_BIT);
-  gl.useProgram(prg.p);
-  currentBuffer = null;
-  gl.uniformMatrix4fv(prg.uVP, false, camera.viewProj);
-  gl.uniform3fv(prg.uEye, camera.cameraEye);
-  gl.uniform3fv(prg.uFog, [0.56, 0.43, 0.35]);
-  gl.uniform1f(prg.uNight, G.player?.vision ? 1 : 0);
+  gl.useProgram(scenePrg.p);
+  activePrg = scenePrg;
   gl.disable(gl.CULL_FACE);
+}
+
+/** The program currently bound, for the passes that need to check. */
+export function currentProgram() {
+  return activePrg;
 }

@@ -14,12 +14,24 @@ import {
 } from '../world/sites.js';
 import { camera } from '../core/viewport.js';
 import { chassisData } from '../data/chassis.js';
-import { draw, drawPart, pass, renderSky } from '../core/renderer.js';
+import {
+  draw,
+  drawPart,
+  pass,
+  setMaterial,
+  blendAdditive,
+  blendAlpha,
+  blendMode,
+  blendEnd,
+} from '../core/renderer.js';
+import { world } from '../core/gl.js';
+import { activeTier } from '../core/quality.js';
+import { allocate, renderFrame } from './pipeline.js';
+import { beginLightFrame, addPointLight, MATERIAL } from '../core/lighting.js';
 import { drawAllies } from '../net/coop-bridge.js';
 import { drawEntity, drawMech, lineMatrix, transportParts } from '../entities/draw.js';
 import { forward } from '../sim/combat.js';
 import { geo } from '../core/mesh.js';
-import { gl } from '../core/gl.js';
 import { ground, scenery } from '../world/level.js';
 import { pools, structures } from '../entities/pools.js';
 import { settings } from '../core/settings.js';
@@ -33,9 +45,7 @@ function drawMissionStructures() {
     if (!b.on) continue;
     const y = terrainY(b.p.x, b.p.z);
     pass.wireTint = [0.28, 0.84, 0.96];
-    gl.enable(gl.BLEND);
-    gl.depthMask(false);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+    blendAdditive();
     draw(
       geo.ring,
       M.transform([b.p.x, y + 0.25, b.p.z], [b.p.r, 1, b.p.r]),
@@ -43,8 +53,7 @@ function drawMissionStructures() {
       0.8,
       1,
     );
-    gl.depthMask(true);
-    gl.disable(gl.BLEND);
+    blendEnd();
     for (const side of [-1, 1])
       draw(
         geo.box,
@@ -56,9 +65,7 @@ function drawMissionStructures() {
   }
   drawRidgeStructures();
   if (structures.reactor.alive && reactorShielded()) {
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-    gl.depthMask(false);
+    blendAdditive();
     pass.wireTint = [0.28, 0.77, 0.94];
     if (!pass.imagingPass)
       draw(
@@ -83,8 +90,7 @@ function drawMissionStructures() {
         pass.imagingPass ? 0.65 : 0.14,
         1,
       );
-    gl.depthMask(true);
-    gl.disable(gl.BLEND);
+    blendEnd();
   }
 }
 
@@ -101,9 +107,7 @@ function drawRidgeStructures() {
       1,
     );
   if (locked) {
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-    gl.depthMask(false);
+    blendAdditive();
     if (!pass.imagingPass)
       draw(
         geo.box,
@@ -120,8 +124,7 @@ function drawRidgeStructures() {
         0.55,
         1,
       );
-    gl.depthMask(true);
-    gl.disable(gl.BLEND);
+    blendEnd();
   }
   const on = G.missionFlags[5] && G.missionFlags[6],
     col = G.missionFlags[7] ? hex('#ace493') : on ? hex('#72dee4') : hex('#bf9465');
@@ -131,9 +134,7 @@ function drawRidgeStructures() {
   draw(geo.dish, M.mul(base, M.transform([0, 0, 0], [13, 10, 10], [-0.55, 0, 0])), hex('#a9bfb3'));
   draw(geo.sphere, M.transform([beaconSite.x, by + 57, beaconSite.z], [0.9, 0.9, 0.9]), col, 1, 1);
   const fy = terrainY(flightLink.x, flightLink.z);
-  gl.enable(gl.BLEND);
-  gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-  gl.depthMask(false);
+  blendAdditive();
   draw(
     geo.ring,
     M.transform([flightLink.x, fy + 0.25, flightLink.z], [flightLink.r, 1, flightLink.r]),
@@ -171,8 +172,52 @@ function drawRidgeStructures() {
       );
     }
   }
-  gl.depthMask(true);
-  gl.disable(gl.BLEND);
+  blendEnd();
+}
+
+/**
+ * Offer this frame's dynamic lights.
+ *
+ * Everything that glows in the world also lights what is around it: rounds in flight,
+ * beam weapons along their length, and the brief flare of an impact. The budget is small,
+ * so `addPointLight` ranks them and keeps the ones that will actually be visible.
+ */
+function emitSceneLights() {
+  if (pass.imagingPass) return;
+
+  for (const p of pools.projectiles) {
+    const missile = p.type === 'missile';
+    addPointLight(
+      p.p,
+      [
+        p.color[0] * (missile ? 5 : 3),
+        p.color[1] * (missile ? 5 : 3),
+        p.color[2] * (missile ? 5 : 3),
+      ],
+      missile ? 34 : 22,
+      missile ? 1.3 : 1,
+    );
+  }
+
+  for (const b of pools.beams) {
+    // One light at the midpoint rather than along the length: a beam is on screen for a
+    // fraction of a second and nobody can tell it is not a line light.
+    const fade = b.life / b.max;
+    const mid = [(b.a[0] + b.b[0]) / 2, (b.a[1] + b.b[1]) / 2, (b.a[2] + b.b[2]) / 2];
+    addPointLight(mid, [b.c[0] * 9 * fade, b.c[1] * 9 * fade, b.c[2] * 9 * fade], 60, 2);
+  }
+
+  for (const p of pools.particles) {
+    if (p.smoke) continue;
+    const fade = clamp(p.life / 0.3, 0, 1);
+    if (fade < 0.25) continue;
+    addPointLight(
+      p.p,
+      [p.color[0] * 7 * fade, p.color[1] * 7 * fade, p.color[2] * 7 * fade],
+      18 + p.size * 5,
+      1.1,
+    );
+  }
 }
 
 export function renderWorld() {
@@ -225,28 +270,130 @@ export function renderWorld() {
     ),
     view,
   );
-  renderSky();
+  beginLightFrame();
+  emitSceneLights();
+
+  const tier = activeTier();
+  allocate(world.width, world.height, tier);
+  renderFrame(tier, {
+    drawOpaque: drawOpaqueWorld,
+    drawTransparent: drawTransparentWorld,
+    damage: G.damageFlash,
+  });
+  pass.imagingPass = false;
+}
+
+/**
+ * Everything solid.
+ *
+ * Called once per shadow cascade and once more for the camera, so it must stay free of
+ * anything that is not geometry: no blend state, no target changes, no per-frame
+ * bookkeeping. The blend helpers it does reach for are no-ops during a cascade.
+ */
+function drawOpaqueWorld() {
+  setMaterial(MATERIAL.terrain);
   pass.wireTint = [0.13, 0.53, 0.33];
   draw(ground, M.identity());
   pass.wireTint = [0.2, 0.74, 0.49];
   draw(scenery, M.identity());
-  // Contact shadows keep the low-polygon machines grounded.
-  gl.enable(gl.BLEND);
-  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-  gl.depthMask(false);
+  const cull = activeTier().entityDrawDistance;
+  setMaterial(MATERIAL.armor);
   for (const e of pools.entities) {
-    if (pass.imagingPass || dist2({ x: camera.cameraEye[0], z: camera.cameraEye[2] }, e) > 1700)
-      continue;
-    const r =
-      e.type === 'mech' ? 10 * e.scale : e.type === 'tower' ? 20 : e.type === 'uplink' ? 33 : 7;
+    if (dist2({ x: camera.cameraEye[0], z: camera.cameraEye[2] }, e) < cull) drawEntity(e);
+  }
+  if (G.state === 'menu') drawMech(menuHero(), true);
+  drawAllies();
+  setMaterial(MATERIAL.metal);
+  drawMissionStructures();
+  pass.wireTint = [0.29, 0.84, 0.72];
+  if (allObjectivesComplete()) {
+    setMaterial(MATERIAL.armor);
+    for (const p of transportParts) drawPart(p, transportMatrix());
+  }
+}
+
+/** Where the extraction transport is this frame. Shared by its hull and its engine glow. */
+function transportMatrix() {
+  const descent = clamp(G.transportTime / 14, 0, 1);
+  const y =
+    terrainY(extraction.x, extraction.z) +
+    28 +
+    (1 - descent) * 125 +
+    Math.sin(G.realTime * 0.8) * 0.5;
+  return M.transform([extraction.x, y, extraction.z], [1, 1, 1], [0, -0.22, 0]);
+}
+
+/**
+ * Engine glow, the landing rings and the beacon column.
+ *
+ * The transport arrives only once all three sectors and the flight codes are secure, so
+ * none of this exists for most of a mission.
+ */
+function drawTransportEffects() {
+  if (!allObjectivesComplete()) return;
+
+  pass.wireTint = [0.29, 0.84, 0.72];
+  const mat = transportMatrix();
+
+  blendAdditive();
+  for (const side of [-1, 1])
+    for (const z of [-12, 3])
+      draw(
+        geo.cone,
+        M.mul(
+          mat,
+          M.transform([side * 23, -10, z], [1.9, 4 + Math.sin(G.realTime * 20) * 0.2, 1.9]),
+        ),
+        hex('#9fbac2'),
+        0.15,
+        1,
+      );
+  blendEnd();
+
+  const y = terrainY(extraction.x, extraction.z);
+  blendAdditive();
+  draw(
+    geo.ring,
+    M.transform([extraction.x, y + 0.3, extraction.z], [42, 1, 42]),
+    hex('#99dda2'),
+    0.8,
+    1,
+  );
+  draw(
+    geo.ring,
+    M.transform(
+      [extraction.x, y + 0.3, extraction.z],
+      [32 + Math.sin(G.realTime * 2) * 3, 1, 32 + Math.sin(G.realTime * 2) * 3],
+    ),
+    hex('#b9deb0'),
+    0.35,
+    1,
+  );
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * TAU,
+      x = extraction.x + Math.sin(a) * 45,
+      z = extraction.z + Math.cos(a) * 45;
     draw(
-      geo.disk,
-      M.transform([e.x, e.y + 0.1, e.z], [r, 0.014, r * 0.8]),
-      [0.12, 0.14, 0.12],
-      0.22,
+      geo.sphere,
+      M.transform([x, terrainY(x, z) + 1, z], [0.6, 0.5, 0.6]),
+      hex('#adffad'),
+      1,
+      1,
     );
   }
-  const hero = {
+  draw(
+    geo.cyl,
+    M.transform([extraction.x, y + 30, extraction.z], [1, 30, 1]),
+    hex('#b8eead'),
+    0.12,
+    1,
+  );
+  blendEnd();
+}
+
+/** The chassis on show behind the menu. */
+function menuHero() {
+  return {
     x: 0,
     z: 92,
     y: terrainY(0, 92),
@@ -256,98 +403,49 @@ export function renderWorld() {
     speed: 0,
     alive: true,
   };
-  if (G.state === 'menu')
-    draw(
-      geo.disk,
-      M.transform([hero.x, hero.y + 0.13, hero.z], [19, 0.02, 12]),
-      [0.11, 0.14, 0.12],
-      0.32,
-    );
-  gl.depthMask(true);
-  gl.disable(gl.BLEND);
-  for (const e of pools.entities) {
-    if (dist2({ x: camera.cameraEye[0], z: camera.cameraEye[2] }, e) < 1700) drawEntity(e);
-  }
-  if (G.state === 'menu') drawMech(hero, true);
-  drawAllies();
-  drawMissionStructures();
-  pass.wireTint = [0.29, 0.84, 0.72];
-  if (allObjectivesComplete()) {
-    const descent = clamp(G.transportTime / 14, 0, 1),
-      y =
-        terrainY(extraction.x, extraction.z) +
-        28 +
-        (1 - descent) * 125 +
-        Math.sin(G.realTime * 0.8) * 0.5,
-      mat = M.transform([extraction.x, y, extraction.z], [1, 1, 1], [0, -0.22, 0]);
-    for (const p of transportParts) drawPart(p, mat);
-    gl.enable(gl.BLEND);
-    gl.depthMask(false);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-    for (const side of [-1, 1])
-      for (const z of [-12, 3])
-        draw(
-          geo.cone,
-          M.mul(
-            mat,
-            M.transform([side * 23, -10, z], [1.9, 4 + Math.sin(G.realTime * 20) * 0.2, 1.9]),
-          ),
-          hex('#9fbac2'),
-          0.15,
-          1,
-        );
-    gl.depthMask(true);
-    gl.disable(gl.BLEND);
-  }
-  // The transport arrives only after all three sectors and the flight codes are secure.
-  if (allObjectivesComplete()) {
-    const y = terrainY(extraction.x, extraction.z);
-    gl.enable(gl.BLEND);
-    gl.depthMask(false);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-    draw(
-      geo.ring,
-      M.transform([extraction.x, y + 0.3, extraction.z], [42, 1, 42]),
-      hex('#99dda2'),
-      0.8,
-      1,
-    );
-    draw(
-      geo.ring,
-      M.transform(
-        [extraction.x, y + 0.3, extraction.z],
-        [32 + Math.sin(G.realTime * 2) * 3, 1, 32 + Math.sin(G.realTime * 2) * 3],
-      ),
-      hex('#b9deb0'),
-      0.35,
-      1,
-    );
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * TAU,
-        x = extraction.x + Math.sin(a) * 45,
-        z = extraction.z + Math.cos(a) * 45;
+}
+
+/**
+ * Everything that blends: contact shadows on the lowest tier, engine glow, the extraction
+ * markers, smoke, sparks, beams and rounds in flight. Drawn once, into the camera's view
+ * only — none of it casts.
+ */
+function drawTransparentWorld() {
+  const tier = activeTier();
+
+  // With no shadow cascades there is nothing anchoring a machine to the ground, so the
+  // original's blob decals come back as a fallback. Above that tier they would only
+  // double-darken what the cascades already drew.
+  if (tier.shadowCascades === 0 && !pass.imagingPass) {
+    blendAlpha();
+    for (const e of pools.entities) {
+      if (dist2({ x: camera.cameraEye[0], z: camera.cameraEye[2] }, e) > tier.entityDrawDistance)
+        continue;
+      const r =
+        e.type === 'mech' ? 10 * e.scale : e.type === 'tower' ? 20 : e.type === 'uplink' ? 33 : 7;
       draw(
-        geo.sphere,
-        M.transform([x, terrainY(x, z) + 1, z], [0.6, 0.5, 0.6]),
-        hex('#adffad'),
-        1,
-        1,
+        geo.disk,
+        M.transform([e.x, e.y + 0.1, e.z], [r, 0.014, r * 0.8]),
+        [0.12, 0.14, 0.12],
+        0.22,
       );
     }
-    draw(
-      geo.cyl,
-      M.transform([extraction.x, y + 30, extraction.z], [1, 30, 1]),
-      hex('#b8eead'),
-      0.12,
-      1,
-    );
-    gl.depthMask(true);
-    gl.disable(gl.BLEND);
+    if (G.state === 'menu') {
+      const hero = menuHero();
+      draw(
+        geo.disk,
+        M.transform([hero.x, hero.y + 0.13, hero.z], [19, 0.02, 12]),
+        [0.11, 0.14, 0.12],
+        0.32,
+      );
+    }
+    blendEnd();
   }
-  pass.imagingPass = false;
-  gl.enable(gl.BLEND);
-  gl.depthMask(false);
-  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+  setMaterial(MATERIAL.emissive);
+  drawTransportEffects();
+
+  blendAlpha();
   for (const p of pools.particles) {
     if (!p.smoke) continue;
     draw(
@@ -358,7 +456,7 @@ export function renderWorld() {
       0,
     );
   }
-  gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+  blendMode('add');
   for (const p of pools.particles) {
     if (p.smoke) continue;
     draw(
@@ -378,6 +476,5 @@ export function renderWorld() {
     draw(geo.cyl, lineMatrix(tail, p.p, p.type === 'missile' ? 0.33 : 0.23), p.color, 1, 1);
     draw(geo.sphere, M.transform(p.p, [0.38, 0.38, 0.38]), [1, 0.9, 0.6], 1, 1);
   }
-  gl.depthMask(true);
-  gl.disable(gl.BLEND);
+  blendEnd();
 }

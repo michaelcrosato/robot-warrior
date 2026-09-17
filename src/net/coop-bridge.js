@@ -9,7 +9,7 @@ import { allObjectivesComplete } from '../entities/spawn.js';
 import { burst, drawMech, soloSpawnBeam } from '../entities/draw.js';
 import { camera } from '../core/viewport.js';
 import { chassisData } from '../data/chassis.js';
-import { draw, pass, project } from '../core/renderer.js';
+import { draw, pass, project, blendAdditive, blendEnd } from '../core/renderer.js';
 import { extraction } from '../world/sites.js';
 import {
   finishSoloMission,
@@ -30,7 +30,6 @@ import {
   weaponDisabled,
 } from '../sim/combat.js';
 import { geo } from '../core/mesh.js';
-import { gl } from '../core/gl.js';
 import { playerModels } from '../entities/models.js';
 import { poly, rect, txt } from '../hud/primitives.js';
 import { pools } from '../entities/pools.js';
@@ -251,9 +250,7 @@ export function drawAllies() {
         0.3,
       );
       if (p.altitude > 1 && p.alive) {
-        gl.enable(gl.BLEND);
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-        gl.depthMask(false);
+        blendAdditive();
         for (const side of [-1, 1])
           draw(
             geo.cone,
@@ -262,8 +259,7 @@ export function drawAllies() {
             0.45,
             1,
           );
-        gl.depthMask(true);
-        gl.disable(gl.BLEND);
+        blendEnd();
       }
     }
 }

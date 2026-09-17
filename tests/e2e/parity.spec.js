@@ -194,16 +194,73 @@ test.describe('unpacked build matches the original', () => {
     expect(errors).toEqual([]);
   });
 
-  test('exposes the world canvas through a live WebGL context', async ({ page }) => {
+  test('exposes the world canvas through a live WebGL 2 context', async ({ page }) => {
     await page.goto('/');
     await waitForBoot(page);
     const info = await page.evaluate(() => {
       const c = /** @type {HTMLCanvasElement} */ (document.getElementById('world'));
-      const gl = c.getContext('webgl');
-      return { hasContext: !!gl, lost: gl ? gl.isContextLost() : true, width: c.width };
+      // The renderer needs WebGL 2: vertex array objects, a depth texture array for the
+      // shadow cascades, and float render targets for the HDR pass. Asking for 'webgl'
+      // here returns null once a 'webgl2' context exists on the canvas.
+      const gl = /** @type {WebGL2RenderingContext} */ (c.getContext('webgl2'));
+      return {
+        hasContext: !!gl,
+        lost: gl ? gl.isContextLost() : true,
+        width: c.width,
+        height: c.height,
+        version: gl ? String(gl.getParameter(gl.VERSION)) : '',
+        maxArrayLayers: gl ? gl.getParameter(gl.MAX_ARRAY_TEXTURE_LAYERS) : 0,
+      };
     });
     expect(info.hasContext).toBe(true);
     expect(info.lost).toBe(false);
     expect(info.width).toBeGreaterThan(0);
+    expect(info.height).toBeGreaterThan(0);
+    expect(info.version).toContain('WebGL 2');
+    // Four cascades is the most any tier asks for.
+    expect(info.maxArrayLayers).toBeGreaterThanOrEqual(4);
+  });
+
+  test('renders the upgraded pipeline without GL errors', async ({ page }) => {
+    // Shadow cascades, the HDR target and the post chain all bind framebuffers and
+    // textures every frame. A mistake there usually still draws something, so the check
+    // that matters is whether the driver is reporting errors — which nothing in the game
+    // would otherwise surface.
+    const errors = watchErrors(page);
+    await page.goto('/');
+    await waitForBoot(page);
+    await page.click('#startBtn');
+    await page.waitForFunction(() => window.RobotWarrior.getStatus().state === 'playing');
+    await page.waitForTimeout(2500);
+
+    const glError = await page.evaluate(() => {
+      const c = /** @type {HTMLCanvasElement} */ (document.getElementById('world'));
+      const gl = /** @type {WebGL2RenderingContext} */ (c.getContext('webgl2'));
+      const code = gl.getError();
+      return code === gl.NO_ERROR ? 'NO_ERROR' : '0x' + code.toString(16);
+    });
+    expect(glError, 'the driver must report no GL error after a frame').toBe('NO_ERROR');
+
+    // The scene must actually have been drawn to, not just cleared.
+    const lit = await page.evaluate(() => {
+      const c = /** @type {HTMLCanvasElement} */ (document.getElementById('world'));
+      const gl = /** @type {WebGL2RenderingContext} */ (c.getContext('webgl2'));
+      const px = new Uint8Array(4 * 64);
+      gl.readPixels(
+        Math.floor(c.width / 2) - 8,
+        Math.floor(c.height / 2) - 8,
+        8,
+        8,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        px,
+      );
+      let sum = 0;
+      for (let i = 0; i < px.length; i += 4) sum += px[i] + px[i + 1] + px[i + 2];
+      return sum;
+    });
+    expect(lit, 'the centre of the world canvas must not be black').toBeGreaterThan(0);
+
+    expect(errors).toEqual([]);
   });
 });

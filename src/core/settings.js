@@ -5,7 +5,8 @@ export const settings = {
   volume: 0.7,
   music: 0.35,
   sensitivity: 0.6,
-  quality: 'balanced',
+  // 'auto' resolves per device — see src/core/quality.js. Anything else names a tier.
+  quality: 'auto',
   shake: true,
   invert: false,
 };

@@ -83,6 +83,11 @@ export interface GameStatus {
 }
 
 declare global {
+  interface Navigator {
+    /** Chrome-only, coarse RAM hint in GiB. One signal among several for quality tiering. */
+    readonly deviceMemory?: number;
+  }
+
   interface Window {
     /** Safari's prefixed constructor, used as a fallback when AudioContext is absent. */
     readonly webkitAudioContext?: typeof AudioContext;

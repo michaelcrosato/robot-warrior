@@ -8,6 +8,7 @@ import { chassisData } from '../data/chassis.js';
 import { drawTacticalMap } from '../hud/screens.js';
 import { pauseGame, resumeGame, returnMenu, startMission, toast } from '../net/coop-bridge.js';
 import { resize } from '../core/viewport.js';
+import { setActiveTier } from '../core/quality.js';
 import { saveSettings, settings } from '../core/settings.js';
 import { sound } from '../audio/sound-system.js';
 import { toggleImaging } from '../sim/update.js';
@@ -89,9 +90,15 @@ export function initMenu() {
       saveSettings();
     });
   }
+  // Legacy saved values ('retro', 'balanced', 'sharp') no longer name anything; the
+  // select falls back to its first option, which is 'auto', and that is the right answer.
   $('quality').value = settings.quality;
+  if (!$('quality').value) $('quality').value = 'auto';
   $('quality').addEventListener('change', () => {
     settings.quality = $('quality').value;
+    // Re-resolve the tier before resizing: the canvas size and every render target is
+    // derived from it, and resize() is what rebuilds them.
+    setActiveTier(settings.quality === 'auto' ? undefined : settings.quality);
     resize();
     saveSettings();
   });
