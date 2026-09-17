@@ -1,0 +1,44 @@
+# --- Third-party audio: never committed -------------------------------------
+# assets/audio/music/ holds the MechWarrior 2 soundtrack MP3s that were embedded
+# in the original single-file build. They are copyrighted commercial recordings
+# and are deliberately kept out of this repository. See docs/assets.md.
+/assets/audio/music/
+
+# The original 13 MB single-file build. It is the local source the asset
+# extractor reads, and it carries those same MP3s inline, so it stays untracked.
+/RobotWarrior.html
+
+# --- Build output ------------------------------------------------------------
+dist/
+dist-single/
+.vite/
+
+# --- Dependencies ------------------------------------------------------------
+node_modules/
+.pnpm-store/
+
+# --- Test + tooling artifacts ------------------------------------------------
+coverage/
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+*.tsbuildinfo
+tests/e2e/__baseline__/*.local.json
+
+# --- Environment / editor ----------------------------------------------------
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# --- Agent scratch -----------------------------------------------------------
+.claude/settings.local.json
+.claude/scratch/
+
+# One-shot migration tooling used to unpack the original single-file build.
+/.migration/

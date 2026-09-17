@@ -1,0 +1,67 @@
+{
+  "name": "robot-warrior",
+  "version": "4.0.0",
+  "private": false,
+  "description": "A browser-native heavy-mech combat sim: WebGL renderer, canvas HUD, offline solo campaign and four-pilot online co-op, with no engine and no runtime dependencies.",
+  "keywords": [
+    "webgl",
+    "game",
+    "mech",
+    "canvas",
+    "webrtc",
+    "co-op",
+    "vanilla-js"
+  ],
+  "license": "MIT",
+  "author": "Michael Crosato",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/michaelcrosato/robot-warrior.git"
+  },
+  "homepage": "https://michaelcrosato.github.io/robot-warrior/",
+  "bugs": "https://github.com/michaelcrosato/robot-warrior/issues",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@12.3.4",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "assets:extract": "node scripts/extract-assets.mjs",
+    "assets:check": "node scripts/check-assets.mjs",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "pnpm run build && playwright test",
+    "test:e2e:update": "pnpm run build && playwright test --update-snapshots",
+    "verify": "pnpm run assets:check && pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build && pnpm run test:e2e",
+    "baseline": "node scripts/capture-baseline.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^22.20.3",
+    "@vitest/coverage-v8": "^5.0.1",
+    "acorn": "^8.18.0",
+    "eslint": "^10.10.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-scope": "^9.1.2",
+    "globals": "^17.12.0",
+    "prettier": "^3.9.6",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.1"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}
