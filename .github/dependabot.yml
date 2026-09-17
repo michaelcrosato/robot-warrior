@@ -1,0 +1,39 @@
+version: 2
+
+updates:
+  # Only dev dependencies exist — see docs/adr/0005-no-runtime-dependencies.md — so an
+  # update here can break the build or the tests, but never a player's browser.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+      include: scope
+    groups:
+      # One PR for the lint and format toolchain rather than four.
+      lint-and-format:
+        patterns:
+          - "eslint*"
+          - "@eslint/*"
+          - "prettier*"
+          - "globals"
+      test-tooling:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+          - "@playwright/*"
+      build-tooling:
+        patterns:
+          - "vite"
+          - "typescript"
+          - "@types/*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "ci"

@@ -1,0 +1,194 @@
+# Architecture
+
+RobotWarrior is a browser game with no engine and no runtime dependencies. It draws
+the world with raw WebGL, the HUD with a 2D canvas on top, and runs co-op over WebRTC
+data channels. Roughly 9,400 lines across 41 modules under `src/`.
+
+This document describes the shape of the code, and is honest about the parts that are
+awkward. If you are here to change something, read [Shared state](#shared-state) and
+[The co-op seam](#the-co-op-seam) first — they are where surprises live.
+
+## Layers
+
+Rendering flows downward; nothing in a lower layer reaches up.
+
+```
+                    ┌──────────────────────────────────┐
+  entry             │  main.js                         │  boot order + status API
+                    └──────────────────────────────────┘
+                    ┌──────────────────────────────────┐
+  frame loop        │  loop.js                         │  rAF, dt, fps
+                    └──────────────────────────────────┘
+       ┌──────────────────┬──────────────────┬──────────────────┐
+  ui   │  ui/             │  hud/            │  render/         │
+       │  menu, input     │  cockpit, map    │  world pass      │
+       └──────────────────┴──────────────────┴──────────────────┘
+       ┌──────────────────┬──────────────────┬──────────────────┐
+  game │  sim/            │  entities/       │  net/            │
+       │  combat, ai,     │  spawn, models,  │  coop, transport │
+       │  movement,       │  pools, draw     │  protocol        │
+       │  mission, player │                  │                  │
+       └──────────────────┴──────────────────┴──────────────────┘
+       ┌──────────────────┬──────────────────┬──────────────────┐
+  base │  core/           │  world/          │  data/           │
+       │  gl, shaders,    │  terrain, level, │  chassis specs,  │
+       │  geometry, mesh, │  sites           │  audio manifest  │
+       │  renderer, math  │                  │                  │
+       └──────────────────┴──────────────────┴──────────────────┘
+                    ┌──────────────────────────────────┐
+  audio             │  audio/  soundtrack, sound-system│
+                    └──────────────────────────────────┘
+```
+
+| Directory       | Files | Lines | What lives there                                             |
+| --------------- | ----: | ----: | ------------------------------------------------------------ |
+| `src/core/`     |    11 |   747 | WebGL context, shaders, procedural geometry, draw path, math |
+| `src/world/`    |     3 |   451 | Terrain height field, static level geometry, map sites       |
+| `src/data/`     |     2 |   357 | Chassis specifications, generated audio manifest             |
+| `src/entities/` |     4 |   911 | Object pools, mech models, spawners, per-entity drawing      |
+| `src/audio/`    |     2 |   457 | Streaming soundtrack, procedural effects, radio speech       |
+| `src/sim/`      |     7 |  1629 | Mutable state, pilot, combat, movement, AI, mission logic    |
+| `src/render/`   |     1 |   383 | The world render pass                                        |
+| `src/hud/`      |     3 |  1357 | Cockpit frame, instruments, tactical map                     |
+| `src/ui/`       |     2 |   360 | Menu and settings wiring, input handling                     |
+| `src/net/`      |     4 |  2591 | Co-op lobby, lockstep simulation, WebRTC transports          |
+
+## Nothing is loaded — everything is generated
+
+There are no model files, no textures and no level format. `src/core/geometry.js`
+generates boxes, cylinders, spheres, dishes, rings and six rock variants
+procedurally; `src/core/mesh.js` uploads them once and hands out shared meshes.
+`src/world/level.js` places the entire three-sector map by running placement code at
+module evaluation and baking the result into one static buffer. Roads and ground
+markings are real geometry, not textures.
+
+Consequences worth knowing:
+
+- Level geometry is **baked once at startup** and never rebuilt. Changing placement
+  code requires a reload, not a mission restart.
+- The world is **reproducible**. Layout is drawn from a seeded generator in
+  `src/core/math.js` that `populate()` rewinds to a fixed value, so the same mission
+  always produces the same 19-entity roster in the same places. The end-to-end suite
+  asserts exactly that, which is what makes refactors here verifiable.
+- Anything that draws from the shared generator at startup shifts every later draw.
+  `rockGeom` deliberately derives its shape from its variant index instead, and a unit
+  test pins that.
+
+## Shared state
+
+The game keeps its mutable state in a small number of exported objects rather than
+threading a context through every call. This is the single most important thing to
+understand before editing.
+
+| Object       | Module                  | Holds                                            |
+| ------------ | ----------------------- | ------------------------------------------------ |
+| `G`          | `src/sim/state.js`      | Mission and pilot state — 46 fields              |
+| `camera`     | `src/core/viewport.js`  | Viewport size and the camera basis               |
+| `pass`       | `src/core/renderer.js`  | Flags for the render pass in flight              |
+| `pools`      | `src/entities/pools.js` | Live entity, particle, beam and projectile pools |
+| `structures` | `src/entities/pools.js` | Named mission structures, reassigned per reset   |
+
+**Why objects and not exported `let`s.** ES modules forbid assigning to an imported
+binding. The simulation, the HUD, the menu, the frame loop and the co-op layer all
+write to this state, so a plain `export let` would only work for whichever module
+happened to own the declaration. Properties of a shared object preserve the original
+single-scope aliasing exactly, which is what let the unpacking be verified rather than
+rewritten — see [ADR 0002](adr/0002-shared-state-as-namespace-objects.md).
+
+**When adding state**, put it on the object whose cluster it belongs to if more than
+one module writes it, and use a plain module-level `let` if only the declaring module
+does. Do not reach for `G` by default; it is already larger than it should be.
+
+**One trap.** These object names become free identifiers in every module that touches
+the state. A local variable of the same name shadows them silently. `camera` is
+`camera` and not `view` precisely because `view` collided with an existing local and
+produced a temporal-dead-zone crash on the first frame.
+
+## The co-op seam
+
+`src/net/coop-bridge.js` is the boundary between solo and co-op play. For each action
+that behaves differently in a session — `startMission`, `fireWeapon`, `announce`,
+`updateEnemies`, `drawHUD` and a dozen more — it exports one function that dispatches
+to the co-op layer when a session is live and to the `solo*` implementation in
+`src/sim/` otherwise.
+
+The rest of the game calls the bridge and never checks whether co-op is active. That
+is the point: there is one place where the two modes diverge.
+
+`initCoop()` also wraps the audio system's `tone`, `noise`, `say` and `fxPlay` so a
+replayed or remote-owned frame stays silent. Without that, reconciliation would
+retrigger every sound it replays.
+
+Co-op runs a lockstep simulation: the host advances authoritative frames, clients
+predict locally and reconcile against host snapshots. `src/net/coop.js` is the largest
+module in the codebase (~2,000 lines) and is the least covered by tests — it needs
+four live peers to exercise properly.
+
+## Boot order
+
+`src/main.js` states startup explicitly instead of relying on a script's
+top-to-bottom execution. It imports the modules whose evaluation has observable
+effects — compiling shaders, uploading primitive meshes, reading stored settings,
+baking level geometry — in their original order, then runs the sequence:
+
+```
+applyChassisWeapons()   apply the selected chassis's weapon loadout
+G.player = newPlayer()  build the pilot
+populate()              generate the mission roster
+initMenu()              wire menu, briefing, manual and settings
+initInput()             wire keyboard, mouse, pointer lock, context loss
+initCoop()              install the co-op audio guards and create the session object
+updateChassisUI()       reflect the stored chassis in the menu
+#loading hidden         reveal the menu
+requestAnimationFrame   start the frame loop
+```
+
+It then freezes a read-only `window.RobotWarrior` status API onto the page. Nothing in
+the game reads it; it exists so tests and performance checks can observe real state
+without reaching into modules. `tests/e2e/` is built entirely on it.
+
+## The frame
+
+`frame()` in `src/loop.js` runs once per animation frame:
+
+1. Compute `dt` and update the frame-rate average.
+2. Advance the simulation — pilot, projectiles, effects, enemies, mission objectives.
+3. Render the world pass: sky, terrain, baked scenery, structures, entities.
+4. Draw the HUD to the 2D canvas over it.
+
+Enhanced Imaging is a second render pass with a wireframe tint, which is why
+`pass.imagingPass` and `pass.wireTint` are shared rather than local.
+
+## Verification
+
+```bash
+pnpm verify
+```
+
+Runs, in the order CI runs it: asset check, formatting, lint, typecheck, unit tests,
+production build, end-to-end suite.
+
+`tests/e2e/parity.spec.js` compares the built game against
+`tests/e2e/__baseline__/original.json`, a snapshot captured from the original
+single-file build. It asserts identical menu state and an identical entity roster, and
+separately that frames render, the HUD canvas is drawn to, mission time advances and
+the WebGL context is live. Regenerating the baseline needs the original file, which is
+untracked — see [docs/assets.md](assets.md).
+
+Types are checked with `tsc` in `checkJS` mode. There are no `.ts` files; types come
+from JSDoc, with ambient declarations in `src/types/globals.d.ts`.
+
+## Known rough edges
+
+Recorded rather than hidden:
+
+- `src/net/coop.js` is too large and has no automated coverage.
+- `G` holds 46 fields and mixes mission progress, pilot state, input and UI flags.
+- `sphereGeom`'s top pole band renders unlit; see the test in
+  `tests/unit/geometry.test.js` for why it has not been worth fixing.
+- Several modules import each other cyclically. This is safe as written — only
+  function declarations cross the cycles, and none are called during module
+  evaluation — but it is fragile. Calling an imported function at module top level in
+  `sim/` or `net/` can produce a temporal-dead-zone error.
+- The HUD is drawn with immediate-mode canvas calls each frame with no layout pass, so
+  positions are hand-tuned constants.

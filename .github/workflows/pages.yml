@@ -1,0 +1,73 @@
+name: Deploy to Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time, and never cancel one midway — a cancelled deploy can
+# leave the site on a half-published version.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Pages serves the project from a sub-path, so the build needs that as its base.
+      # Audio URLs are built from BASE_URL for exactly this reason.
+      - name: Build
+        run: pnpm run build
+        env:
+          PUBLIC_BASE: /robot-warrior/
+
+      # The published site will have no mission music: those tracks are not
+      # distributed with the source. The game handles that — see docs/assets.md.
+      - name: Report what shipped
+        run: |
+          echo "### Deployed bundle" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          du -sh dist >> "$GITHUB_STEP_SUMMARY"
+          echo "voice clips: $(ls dist/audio/voice 2>/dev/null | wc -l)" >> "$GITHUB_STEP_SUMMARY"
+          echo "music clips: $(ls dist/audio/music 2>/dev/null | wc -l) (0 is expected)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    name: deploy
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

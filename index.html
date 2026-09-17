@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#171b1b" />
     <meta
       name="description"
-      content="RobotWarrior: a single-file heavy robot combat game with offline solo play and online co-op for up to four pilots. Operation Iron Echo: Kestrel Basin, Ashfall Works, and Blackglass Ridge. Three pilotable mechs. Enhanced Imaging."
+      content="RobotWarrior: a browser-native heavy robot combat game with offline solo play and online co-op for up to four pilots. Operation Iron Echo: Kestrel Basin, Ashfall Works, and Blackglass Ridge. Three pilotable mechs. Enhanced Imaging."
     />
     <title>RobotWarrior — Four-Pilot Co-op / Iron Echo</title>
     <link
@@ -354,13 +354,13 @@
             </p>
           </div>
           <p class="credit">
-            Original game code, art, sound effects, and radio prompts. This build includes the
-            supplied audio files: 3-01 &quot;Reactor Online&quot; for startup, 1-02 Umber Wall for
-            Kestrel Basin, and 1-03 Silent Thunder after the basin is clear. Music loops during each
-            section. In solo play, pause stops playback and resume continues from the same point.
-            Online music follows the shared mission stage. Inspired by 1990s heavy robot
-            simulations. Not affiliated with MechWarrior or its rights holders. All game assets and
-            supplied audio are embedded. Solo play uses no network. Online play uses external
+            Original game code, art, sound effects, and radio prompts. Mission music is an optional
+            local asset and is not distributed with this build: without it, the game plays normally
+            and music is silent. When present, a startup cue plays at boot, one track loops over
+            Kestrel Basin, and a second loops once the basin is clear. In solo play, pause stops
+            playback and resume continues from the same point. Online music follows the shared
+            mission stage. Inspired by 1990s heavy robot simulations. Not affiliated with
+            MechWarrior or its rights holders. Solo play uses no network. Online play uses external
             signaling and ICE services. WebRTC signaling follows the PeerJS 1.5.5 protocol. No
             camera or microphone is used.
           </p>
@@ -587,8 +587,8 @@
         </div>
         <footer class="panel-footer">
           <small id="coopFooter"
-            >All three sectors · All three mechs · Supplied music<br />The host must keep the game
-            open. Solo play still works offline.</small
+            >All three sectors · All three mechs<br />The host must keep the game open. Solo play
+            still works offline.</small
           ><button class="button" id="coopLeave">RETURN TO OPERATIONS</button>
         </footer>
       </div>

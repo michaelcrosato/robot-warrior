@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(pnpm install)",
+      "Bash(pnpm run :*)",
+      "Bash(pnpm verify)",
+      "Bash(pnpm dev)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm exec vite :*)",
+      "Bash(pnpm exec playwright :*)",
+      "Bash(pnpm exec prettier :*)",
+      "Bash(pnpm exec eslint :*)",
+      "Bash(pnpm exec tsc :*)",
+      "Bash(node scripts/:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)"
+    ],
+    "deny": [
+      "Read(./assets/audio/music/**)",
+      "Read(./RobotWarrior.html)",
+      "Bash(git add assets/audio/music/**)",
+      "Bash(git add -f assets/audio/music/**)",
+      "Bash(git add RobotWarrior.html)",
+      "Bash(git add -f RobotWarrior.html)"
+    ]
+  }
+}

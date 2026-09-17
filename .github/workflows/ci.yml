@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A newer push to the same branch makes an in-flight run irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Note: a fresh clone has no assets/audio/music/ — those tracks are not
+      # distributed with the source. check-assets reports them as absent and passes.
+      # See docs/assets.md.
+      - name: Check assets
+        run: pnpm run assets:check
+
+      - name: Check formatting
+        run: pnpm run format:check
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Unit tests
+        run: pnpm run test:coverage
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      # Drives the real game with SwiftShader WebGL and compares it against the
+      # baseline captured from the original single-file build.
+      - name: End-to-end parity suite
+        run: pnpm exec playwright test
+
+      - name: Offline single-file build
+        run: node scripts/bundle-single.mjs
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 7
+
+  # A guard, not a formality: the soundtrack and the original build carry third-party
+  # copyrighted recordings and are gitignored. If either is ever committed — with
+  # `git add -f`, or by someone loosening .gitignore — history is permanent once
+  # pushed, so this fails the build rather than letting it through.
+  licence-guard:
+    name: no third-party audio in git
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Assert no tracked soundtrack or original build
+        run: |
+          tracked=$(git ls-files 'assets/audio/music' 'RobotWarrior.html' '**/RobotWarrior.html')
+          if [ -n "$tracked" ]; then
+            echo "::error::Third-party audio is tracked in git:"
+            echo "$tracked"
+            echo "See docs/adr/0003-keep-the-soundtrack-out-of-the-repo.md"
+            exit 1
+          fi
+          echo "No third-party audio tracked."
+
+      - name: Assert the ignore rules are still in place
+        run: |
+          for path in assets/audio/music/boot.mp3 RobotWarrior.html; do
+            if ! git check-ignore -q "$path"; then
+              echo "::error::$path is no longer gitignored."
+              exit 1
+            fi
+          done
+          echo "Ignore rules intact."

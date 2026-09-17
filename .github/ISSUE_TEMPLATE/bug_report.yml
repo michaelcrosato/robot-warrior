@@ -1,0 +1,78 @@
+name: Bug report
+description: Something in the game behaves wrongly
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing: if there is **no mission music**, that is expected. The soundtrack
+        is not distributed with the source — see
+        [docs/assets.md](https://github.com/michaelcrosato/robot-warrior/blob/main/docs/assets.md).
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: The shortest path from loading the page to the problem.
+      placeholder: |
+        1. Start a mission as Kestrel
+        2. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: status
+    attributes:
+      label: Status output
+      description: |
+        Paste `window.RobotWarrior.getStatus()` from the browser console at the moment the
+        problem is visible. This reports actual simulation state and is usually more
+        useful than a screenshot.
+      render: json
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console errors
+      description: Any errors or warnings from the browser console.
+      render: text
+
+  - type: input
+    id: where
+    attributes:
+      label: Browser and OS
+      placeholder: Chrome 141 on Windows 11
+    validations:
+      required: true
+
+  - type: dropdown
+    id: build
+    attributes:
+      label: Which build
+      options:
+        - The published site (GitHub Pages)
+        - A local dev server (pnpm dev)
+        - A local production build (pnpm build)
+        - The offline single-file build (pnpm build:single)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Solo or co-op
+      options:
+        - Solo
+        - Co-op as host
+        - Co-op as a joining pilot
+        - Not applicable
+    validations:
+      required: true

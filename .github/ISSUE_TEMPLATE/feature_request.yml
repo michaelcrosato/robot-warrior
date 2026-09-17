@@ -1,0 +1,43 @@
+name: Feature or change
+description: Suggest something new, or a change to how the game plays
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What you would like
+      description: Describe the change from a player's point of view.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: What is unsatisfying now, and what this would improve.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of the game
+      options:
+        - Mechs, weapons or balance
+        - Missions and objectives
+        - The map and its three sectors
+        - HUD and cockpit
+        - Controls and input
+        - Audio
+        - Four-pilot co-op
+        - Performance
+        - Build, tooling or tests
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+      description: Optional, but useful — it usually shortens the discussion.

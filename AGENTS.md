@@ -1,0 +1,142 @@
+# Working in this repository
+
+This file is for coding agents. It is the one place that says how to build, verify and
+change this codebase; everything else is reference. Humans should read it too — it is
+shorter than the alternative.
+
+This project is developed almost entirely by agents. That is not a slogan, it is a
+constraint on how the code and the checks are arranged: the verification gate has to be
+trustworthy enough to act as the reviewer, and the reasoning behind non-obvious choices
+has to be written down rather than held in someone's head.
+
+## The rule
+
+**Run `pnpm verify` before you claim anything works.** It runs, in the order CI runs it:
+
+```
+assets:check → format:check → lint → typecheck → test → build → test:e2e
+```
+
+It takes about a minute. Do not report a change as done, fixed or passing without
+reading its output. If you changed one file and want a faster loop, run the individual
+scripts — but the gate is what decides.
+
+## Setup
+
+```bash
+pnpm install
+pnpm exec playwright install chromium    # once; the e2e suite needs a real browser
+pnpm dev                                 # http://127.0.0.1:5180
+```
+
+Node 22 or newer. There is no mission music on a fresh clone and that is correct — see
+[docs/assets.md](docs/assets.md).
+
+## Scripts
+
+| Command                  | What it does                                             |
+| ------------------------ | -------------------------------------------------------- |
+| `pnpm verify`            | The full gate. This is the one that matters.             |
+| `pnpm dev`               | Dev server with hot reload on 127.0.0.1:5180             |
+| `pnpm build`             | Production build to `dist/`                              |
+| `pnpm build:single`      | Offline single-file build to `dist-single/` (gitignored) |
+| `pnpm test`              | Unit tests (Vitest, Node) — fast                         |
+| `pnpm test:watch`        | Unit tests in watch mode                                 |
+| `pnpm test:e2e`          | Builds, then drives the real game in headless Chromium   |
+| `pnpm lint` / `lint:fix` | ESLint                                                   |
+| `pnpm format`            | Prettier, writes                                         |
+| `pnpm typecheck`         | `tsc --noEmit` over JSDoc-typed JavaScript               |
+| `pnpm assets:check`      | Manifest vs. disk                                        |
+| `pnpm assets:extract`    | Re-extract audio from an original build                  |
+
+## Read these before changing code
+
+Two of them, and they will save you a debugging session:
+
+1. **[docs/architecture.md](docs/architecture.md)** — the layer map, and specifically
+   the "Shared state" and "The co-op seam" sections.
+2. **[docs/adr/](docs/adr/README.md)** — why things are the way they are. If you are
+   about to reverse a decision, there is probably a record explaining the cost.
+
+## Things that will bite you
+
+These are not style preferences. Each one has already caused a real failure here.
+
+**Shared state lives on exported objects: `G`, `camera`, `pass`, `pools`,
+`structures`.** ES modules forbid assigning to an imported binding, and this state has
+writers in several modules. Do not "clean this up" into exported `let`s — it will not
+compile. See [ADR 0002](docs/adr/0002-shared-state-as-namespace-objects.md).
+
+**Never introduce a local variable named after one of those objects.** It shadows the
+import silently. A namespace object called `view` once captured a local of the same
+name and crashed the first rendered frame with a temporal-dead-zone error. If you add a
+new namespace object, its name must appear nowhere else in the source.
+
+**Do not call an imported function at module top level in `sim/` or `net/`.** Those
+modules import each other cyclically. It is safe as written because only function
+declarations cross the cycles and none are invoked during evaluation. Invoking one at
+evaluation time will throw. Put startup work in `src/main.js`, which states boot order
+explicitly.
+
+**The world is deterministic, and tests depend on it.** Layout and the enemy roster are
+drawn from a seeded generator in `src/core/math.js` that `populate()` rewinds. Anything
+that draws from it at startup shifts every later draw and changes the roster. If
+`tests/e2e/parity.spec.js` starts failing on entity coordinates after an unrelated
+change, that is what happened.
+
+**Never regenerate `tests/e2e/__baseline__/original.json` to make a test pass.** It is a
+recording of the original build's behaviour. Overwriting it with current behaviour
+destroys the only evidence that a refactor preserved anything. If parity fails, the
+change is wrong until proven otherwise.
+
+**`src/data/audio-manifest.js` is generated.** Edit `scripts/extract-assets.mjs` and
+re-run `pnpm assets:extract`.
+
+**Never commit anything from `assets/audio/music/` or the original `RobotWarrior.html`.**
+Both hold third-party copyrighted recordings and both are gitignored. Git history is
+permanent once pushed. See [ADR 0003](docs/adr/0003-keep-the-soundtrack-out-of-the-repo.md).
+
+## Style
+
+Match the file you are in. The simulation is a hot loop and uses short names and terse
+maths deliberately; that is not something to fix. Prettier settles all formatting, so
+do not argue with it — run it.
+
+Comment the **why**, not the what. `// Contact shadows keep the low-polygon machines
+grounded.` earns its place. `// loop over entities` does not. If a constant was arrived
+at by feel, say so — that is exactly the thing the next reader cannot recover.
+
+Types come from JSDoc on plain JavaScript. There are no `.ts` files and adding one is a
+decision, not a convenience.
+
+## Tests
+
+Unit tests (`tests/unit/`) run in Node and cover the layers that are pure: maths,
+geometry, terrain, map data. If you are adding logic that could live in a pure function,
+put it in one and test it.
+
+The end-to-end suite (`tests/e2e/`) drives the real built game in Chromium through the
+`window.RobotWarrior` status API. Everything that owns WebGL, canvas, audio or socket
+state is covered there or not at all.
+
+When a test encodes behaviour that is imperfect rather than intended, say so in the
+test. `tests/unit/geometry.test.js` has two examples — an unlit sphere pole and a
+`clamp` edge case — and both comments explain why the behaviour stands.
+
+## Commits and pull requests
+
+Conventional Commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`, `perf:`,
+`build:`, `ci:`. Add `!` for a breaking change.
+
+Write the body for someone who will read it in a year with no context. What changed, why
+this approach, what it cost, and what you verified. If you found something surprising,
+that belongs in the commit message — it is the cheapest place to leave it.
+
+Never force-push a shared branch. Never commit secrets.
+
+## If you get stuck
+
+Say so, and say precisely where. A clear report of what you tried and what the output
+was is worth more than a plausible-looking change that has not been verified. Do not
+narrow the task silently — if part of it is blocked, finish the rest and state what is
+left.
