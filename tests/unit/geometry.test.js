@@ -195,9 +195,9 @@ describe('rockGeom', () => {
   });
 
   it('derives its shape from the variant, not from the shared generator', () => {
-    // Rock meshes are uploaded once at startup and reused across missions, so they
-    // must not consume draws from the seeded generator — doing so would shift every
-    // subsequent world-layout draw and make missions irreproducible.
+    // Rock meshes are uploaded once at startup and reused across missions, so they must
+    // not consume draws from the shared generator: doing so would shift every later draw
+    // and move the whole terrain scatter.
     resetRandom(1);
     const a = rockGeom(3);
     resetRandom(9999);

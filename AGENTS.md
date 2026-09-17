@@ -78,11 +78,13 @@ declarations cross the cycles and none are invoked during evaluation. Invoking o
 evaluation time will throw. Put startup work in `src/main.js`, which states boot order
 explicitly.
 
-**The world is deterministic, and tests depend on it.** Layout and the enemy roster are
-drawn from a seeded generator in `src/core/math.js` that `populate()` rewinds. Anything
-that draws from it at startup shifts every later draw and changes the roster. If
-`tests/e2e/parity.spec.js` starts failing on entity coordinates after an unrelated
-change, that is what happened.
+**The terrain scatter is seeded, and the order of draws matters.** `src/world/level.js`
+places rocks and debris from the generator in `src/core/math.js`, and `populate()` rewinds
+it again per mission to fix each enemy's initial AI state. Adding a call that draws from
+that generator at startup shifts every later draw. Entity coordinates themselves are
+authored literals in `populate()`, so they will not move — but structure coordinates are
+derived from `src/world/sites.js` and `terrainY`, and the parity suite compares those
+exactly. If it starts failing on structure coordinates, look there.
 
 **Never regenerate `tests/e2e/__baseline__/original.json` to make a test pass.** It is a
 recording of the original build's behaviour. Overwriting it with current behaviour

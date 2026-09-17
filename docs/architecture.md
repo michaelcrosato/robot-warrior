@@ -66,13 +66,18 @@ Consequences worth knowing:
 
 - Level geometry is **baked once at startup** and never rebuilt. Changing placement
   code requires a reload, not a mission restart.
-- The world is **reproducible**. Layout is drawn from a seeded generator in
-  `src/core/math.js` that `populate()` rewinds to a fixed value, so the same mission
-  always produces the same 19-entity roster in the same places. The end-to-end suite
-  asserts exactly that, which is what makes refactors here verifiable.
-- Anything that draws from the shared generator at startup shifts every later draw.
+- The **terrain scatter is seeded**, not random: the 27 placement loops in
+  `src/world/level.js` draw from the generator in `src/core/math.js`, which starts from a
+  fixed value, so the rocks and debris land in the same places every load. `populate()`
+  rewinds the generator again per mission, which fixes each enemy's initial AI phase,
+  cooldowns and strafe direction.
+- Anything that draws from that generator at startup shifts every later draw.
   `rockGeom` deliberately derives its shape from its variant index instead, and a unit
   test pins that.
+- **Entity coordinates are authored, not generated.** `populate()` writes them out as
+  literals. Structure coordinates are the exception and are derived at spawn from the
+  site table in `src/world/sites.js` and the terrain height field — which is why those are
+  the sharp assertion in the parity suite.
 
 ## Shared state
 
@@ -169,11 +174,21 @@ Runs, in the order CI runs it: asset check, formatting, lint, typecheck, unit te
 production build, end-to-end suite.
 
 `tests/e2e/parity.spec.js` compares the built game against
-`tests/e2e/__baseline__/original.json`, a snapshot captured from the original
-single-file build. It asserts identical menu state and an identical entity roster, and
-separately that frames render, the HUD canvas is drawn to, mission time advances and
-the WebGL context is live. Regenerating the baseline needs the original file, which is
-untracked — see [docs/assets.md](assets.md).
+`tests/e2e/__baseline__/original.json`, a snapshot captured from the original single-file
+build. Specifically it asserts:
+
+- the full menu-time status block matches exactly (41 fields);
+- the mission roster matches — every machine, its type and its sector;
+- every **structure** sits at exactly the coordinates the original put it at, which is
+  the part that catches drift in `sites.js`, `terrainY` or the spawners;
+- every **mech** is within 120 units of where the original had it. Mechs walk, and how
+  far they get in the probe window depends on frame rate, so pinning that exactly is
+  flaky by construction — it was, on a slower CI runner;
+- frames render, the HUD canvas is drawn to, mission time advances, the WebGL context is
+  live.
+
+Regenerating the baseline needs the original file, which is untracked — see
+[docs/assets.md](assets.md).
 
 Types are checked with `tsc` in `checkJS` mode. There are no `.ts` files; types come
 from JSDoc, with ambient declarations in `src/types/globals.d.ts`.

@@ -1,10 +1,10 @@
 /**
  * Capture a behavioural baseline from the original single-file build.
  *
- * This runs against the untracked `RobotWarrior.html` — the 13 MB monolith the
- * unpacked source was derived from. The JSON it writes is the reference the
- * end-to-end parity suite compares against, so the refactor is verified against
- * observed behaviour rather than against an assumption that it still works.
+ * This runs against the untracked `RobotWarrior.html` — the 13 MB monolith the unpacked
+ * source was derived from. The JSON it writes is the reference the end-to-end parity suite
+ * compares against, so the refactor is verified against observed behaviour rather than
+ * against an assumption that it still works.
  *
  *   node scripts/capture-baseline.mjs
  *

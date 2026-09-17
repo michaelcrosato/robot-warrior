@@ -1,5 +1,6 @@
 /**
- * Scalar, vector and 4x4 matrix helpers, plus the seeded generator that makes world layout reproducible.
+ * Scalar, vector and 4x4 matrix helpers, plus the seeded generator the terrain scatter
+ * and enemy AI phases are drawn from.
  */
 export const TAU = Math.PI * 2;
 
@@ -40,9 +41,12 @@ export function random() {
 }
 
 /**
- * Rewind the generator. Terrain scatter, structure placement and the enemy roster
- * are all drawn from it, so resetting to a fixed value is what makes a mission
- * reproducible — and what lets the end-to-end suite assert an exact spawn list.
+ * Rewind the generator.
+ *
+ * The terrain scatter in src/world/level.js draws from it at startup, and populate()
+ * rewinds it again per mission so each enemy opens with the same AI phase, cooldowns and
+ * strafe direction. Entity coordinates are authored rather than drawn, so they are not
+ * affected — but anything new that draws here at startup shifts every later draw.
  *
  * @param {number} [value] seed to rewind to; defaults to the startup seed
  */

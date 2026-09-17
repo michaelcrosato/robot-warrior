@@ -8,7 +8,14 @@
  */
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { probeBoot, probeMission, waitForBoot, measureFrames } from './helpers/probe.js';
+import {
+  probeBoot,
+  probeMission,
+  waitForBoot,
+  measureFrames,
+  STATIC_TYPES,
+  WALK_TOLERANCE,
+} from './helpers/probe.js';
 
 const baseline = JSON.parse(
   readFileSync(new URL('./__baseline__/original.json', import.meta.url), 'utf8'),
@@ -37,17 +44,68 @@ test.describe('unpacked build matches the original', () => {
     expect(boot.coopKeys).toEqual(baseline.boot.coopKeys);
   });
 
-  test('generates a byte-identical mission roster', async ({ page }) => {
+  test('builds the same world: same roster, same structure placement', async ({ page }) => {
     const errors = watchErrors(page);
     await page.goto('/');
 
     const mission = await probeMission(page);
+    const expected = baseline.mission;
 
-    // The world is generated from a seeded generator that resetGame rewinds, so any
-    // drift in the level builder, the spawners or the math layer shows up here.
-    expect(mission.entities).toEqual(baseline.mission.entities);
-    expect(mission.entities.length).toBeGreaterThan(0);
-    expect(mission).toEqual(baseline.mission);
+    // --- the fixed part, compared exactly -------------------------------------
+    // Which machines exist, of what type, in which sector. This is authored in
+    // populate(), so it is fixed by construction — but it still catches a spawner that
+    // stopped running, a zone assignment that moved, or an entity that never got built.
+    const roster = (m) =>
+      m.entities.map((e) => `${e.name} | ${e.type} | ${e.zone}`).sort((a, b) => a.localeCompare(b));
+
+    expect(roster(mission)).toEqual(roster(expected));
+    expect(mission.entities).toHaveLength(expected.entities.length);
+    expect(mission.sector).toBe(expected.sector);
+    expect(mission.chassis).toBe(expected.chassis);
+    expect(mission.objectiveLabels).toEqual(expected.objectiveLabels);
+    expect(mission.objectives).toEqual(expected.objectives);
+    expect(mission.ammo).toBe(expected.ammo);
+    expect(mission.missiles).toBe(expected.missiles);
+
+    const byName = new Map(expected.entities.map((e) => [e.name, e]));
+
+    // Structures never move, and their coordinates are *derived* at spawn from the site
+    // table and the terrain height field rather than written out — so this is the sharp
+    // assertion in this test. Drift in sites.js, terrainY or the spawners lands here.
+    const structures = mission.entities.filter((e) => STATIC_TYPES.includes(e.type));
+    expect(structures.length, 'the mission must place static structures').toBeGreaterThan(0);
+    for (const e of structures) {
+      expect({ name: e.name, x: e.x, z: e.z }).toEqual({
+        name: e.name,
+        x: byName.get(e.name).x,
+        z: byName.get(e.name).z,
+      });
+    }
+
+    // --- the timing-dependent part, bounded rather than pinned -----------------
+    // Mechs spawn at authored coordinates and then walk, on a heading seeded per mission.
+    // How far they get by the time this probe runs depends on how many frames the machine
+    // managed, so an exact comparison is flaky by construction — it failed on a slower CI
+    // runner by one to three units. A tolerance still catches what matters: a mech that
+    // spawned in the wrong place, or in the wrong sector.
+    const mobile = mission.entities.filter((e) => !STATIC_TYPES.includes(e.type));
+    expect(mobile.length, 'the mission must field mechs').toBeGreaterThan(0);
+    for (const e of mobile) {
+      const from = byName.get(e.name);
+      const drift = Math.hypot(e.x - from.x, e.z - from.z);
+      expect(
+        drift,
+        `${e.name} spawned ${drift.toFixed(0)} units from its seeded position`,
+      ).toBeLessThan(WALK_TOLERANCE);
+    }
+
+    // Every machine starts the mission intact and undamaged.
+    for (const e of mission.entities) {
+      expect(e.alive, `${e.name} must start alive`).toBe(true);
+      expect(e.health, `${e.name} must start near full health`).toBeGreaterThan(0.9);
+    }
+    expect(mission.armor).toBeGreaterThan(0.9);
+
     expect(errors).toEqual([]);
   });
 

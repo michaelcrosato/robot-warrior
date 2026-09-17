@@ -10,9 +10,10 @@ boots" is not evidence. A silent behavioural regression — an enemy spawned in 
 place, an objective that no longer fires — could sit unnoticed indefinitely.
 
 The original had one very useful property: a frozen `window.RobotWarrior` status API
-reporting mission state, objectives, pilot telemetry and the full entity roster. And
-world layout is drawn from a seeded generator that `populate()` rewinds, so a generated
-mission is deterministic.
+reporting mission state, objectives, pilot telemetry and the full entity roster. A mission
+is also largely fixed — entity coordinates are authored in `populate()`, and structure
+coordinates are derived from a static site table and the terrain height field — so two
+runs should agree closely enough to diff.
 
 ## Decision
 
@@ -26,13 +27,26 @@ two snapshots — menu state, and the world one mission in — to
 
 Both sides call the same probes from `tests/e2e/helpers/probe.js`. If a probe drifts,
 both sides drift together and the comparison stays honest. Time-varying fields — fps,
-mission clock, audio position — are stripped; the 19-entity roster is compared exactly,
-including names, types, zones and spawn coordinates.
+mission clock, audio position — are stripped. The roster is compared exactly: every
+machine, its type and its sector. Structure coordinates are compared exactly too, because
+those are _derived_ at spawn from the site table and the height field, and so are the part
+that can actually drift.
+
+Mech coordinates are bounded, not pinned. Mechs walk, and how far they get inside the probe
+window depends on frame rate — pinning it was flaky, and duly failed on a slower CI runner
+by one to three units. A 120-unit tolerance still catches the failure that matters: a mech
+spawned in the wrong place, or in the wrong sector.
 
 ## Consequences
 
-- The refactor is verified rather than asserted. The roster check is a sharp instrument:
-  any drift in the math, level or spawn layers changes it.
+- The refactor is verified rather than asserted. The structure-placement check is the sharp
+  instrument: perturbing one site coordinate by five units fails it, which was confirmed
+  deliberately rather than assumed.
+- **The test states only what it proves.** An earlier version claimed the roster was
+  seeded, and therefore that reproducing it demonstrated the math layer intact. It is not:
+  `populate()` writes those coordinates out as literals, and the suite passed unchanged
+  when the seed was deliberately altered. Overstating what a test covers is worse than
+  covering less, because it stops anyone looking further.
 - The suite also asserts frames render, mission time advances, the HUD canvas is actually
   drawn to and the WebGL context is live — so "boots without errors but renders nothing"
   fails.

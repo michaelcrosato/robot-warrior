@@ -104,9 +104,10 @@ variants procedurally, and `src/world/level.js` places the whole three-sector ma
 running code at startup and baking the result into one static buffer. Roads and ground
 markings are geometry, not texture.
 
-The world is also **reproducible**: layout and the enemy roster come from a seeded
-generator, so the same mission always produces the same 19 machines in the same places.
-That property is what makes the test suite sharp — see below.
+The terrain scatter is **seeded rather than random**: the placement loops draw from a
+generator that starts from a fixed value, so the rocks and debris land in the same places
+every load, and each enemy's opening AI phase is fixed per mission too. Entity coordinates
+are authored; structure coordinates are derived from a site table and the height field.
 
 ```
 src/
@@ -153,9 +154,11 @@ mechanical, and therefore verifiable.
 
 **Verifiable mattered more than elegant.** Before anything was touched, a baseline was
 captured from the original build: its full status output at the menu, and the complete
-19-entity roster of a generated mission. The suite in `tests/e2e/parity.spec.js` replays
-the same probes against the unpacked build and diffs them. Any drift in the maths, level
-or spawn layers changes an entity coordinate and fails.
+19-machine roster of a mission. The suite in `tests/e2e/parity.spec.js` replays the same
+probes against the unpacked build and diffs them — the roster exactly, and every structure's
+coordinates exactly, because those are derived at spawn from the site table and the terrain
+height field rather than written out. Moving one site by five units fails it, which was
+checked on purpose rather than assumed.
 
 It also caught a real bug that would otherwise have shipped: the object now called
 `camera` was first called `view`, which silently captured an existing local of that name

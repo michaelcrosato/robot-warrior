@@ -66,11 +66,25 @@ export async function probeBoot(page) {
 }
 
 /**
- * Start a mission and snapshot the generated world.
+ * Entity types that never move once placed.
  *
- * World generation is driven by a seeded LCG that `resetGame` rewinds, so the
- * entity roster — names, types, zones, spawn coordinates — is deterministic and is
- * the strongest signal that the renderer, level builder and spawners still agree.
+ * Their coordinates are derived at spawn from the site table in `src/world/sites.js` and
+ * the terrain height field, so they can be compared exactly. Mechs spawn at authored
+ * coordinates and then start walking, and how far they get depends on how many frames the
+ * machine managed — so their positions are bounded rather than pinned. See `mobile`, below.
+ */
+export const STATIC_TYPES = ['tower', 'uplink', 'turret', 'generator', 'reactor'];
+
+/** How far a mech may legitimately have walked by the time the mission probe runs. */
+export const WALK_TOLERANCE = 120;
+
+/**
+ * Start a mission and snapshot the world it built.
+ *
+ * The roster — which machines exist, of what type, in which sector — is authored in
+ * `populate()` rather than generated, so it is fixed. What the comparison actually
+ * exercises is that the spawners still place every structure where the site table and the
+ * terrain height field say it goes, and that the mission starts in the same state.
  *
  * @param {import('@playwright/test').Page} page
  */
