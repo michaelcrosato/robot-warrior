@@ -18,6 +18,7 @@
  */
 import { caps } from './gl.js';
 import { settings } from './settings.js';
+import { classifyDevice, lowerTierId, TIER_ORDER } from './device.js';
 
 /**
  * @typedef {object} Tier
@@ -40,6 +41,8 @@ import { settings } from './settings.js';
  * @property {number}  entityDrawDistance
  * @property {boolean} softParticles
  */
+
+export { TIER_ORDER };
 
 /** @type {Record<string, Tier>} */
 export const TIERS = {
@@ -151,50 +154,26 @@ export const TIERS = {
   },
 };
 
-/** Tiers in ascending cost, for stepping up or down. */
-export const TIER_ORDER = ['potato', 'low', 'mobile', 'high', 'ultra'];
-
 /**
- * Guess a tier from what the device is willing to report.
+ * Guess a tier from what the device reports.
  *
- * Every signal here is a hint rather than a fact — `WEBGL_debug_renderer_info` is masked
- * in some browsers, `deviceMemory` is coarse and absent on Safari, and a renderer string
- * can name a GPU that is being emulated. So the detection is deliberately coarse, biased
- * one step low, and always overridable from the settings menu.
+ * The classification itself lives in device.js as a pure function, so it can be tested
+ * against real renderer strings without a browser — which is the only part of targeting a
+ * specific phone or graphics card that is checkable from here.
  */
 export function detectTier() {
-  const r = caps.renderer.toLowerCase();
-  const cores = caps.hardwareConcurrency;
-  const memory = caps.deviceMemory;
+  return classifyDevice({
+    renderer: caps.renderer,
+    coarsePointer: caps.coarsePointer,
+    cores: caps.hardwareConcurrency,
+    memory: caps.deviceMemory,
+  });
+}
 
-  // Software rasterisers: correct, and far too slow for a shadowed scene.
-  if (/swiftshader|llvmpipe|software|basic render|microsoft basic/.test(r)) return 'potato';
-
-  if (caps.coarsePointer) {
-    // Recent flagship mobile silicon. A Galaxy S26 lands here.
-    if (
-      /adreno \(tm\) (7|8|9)\d\d|adreno (7|8|9)\d\d|xclipse (9|1\d)\d\d|apple a1[7-9]|apple m\d|immortalis/.test(
-        r,
-      )
-    )
-      return 'mobile';
-    if (/adreno \(tm\) 6\d\d|mali-g7\d|mali-g6\d|apple a1[4-6]/.test(r)) return 'low';
-    // Unknown mobile GPU: start low. A device that copes can be moved up by hand.
-    return cores >= 8 && memory >= 6 ? 'mobile' : 'low';
-  }
-
-  // Desktop discrete parts that comfortably run everything.
-  if (
-    /rtx [45]0\d\d|rtx [23]0[789]0|radeon rx [67]\d00|arc a7\d\d|apple m[1-9] (pro|max|ultra)/.test(
-      r,
-    )
-  )
-    return 'ultra';
-  if (/rtx|geforce gtx 1[06][6-8]0|radeon rx [56]\d00|apple m\d/.test(r)) return 'high';
-  // Integrated desktop graphics.
-  if (/intel|uhd graphics|iris|vega \d|radeon graphics/.test(r)) return 'low';
-
-  return cores >= 8 ? 'high' : 'low';
+/** The tier one step cheaper, or null at the bottom. */
+export function lowerTier(id) {
+  const next = lowerTierId(id);
+  return next ? TIERS[next] : null;
 }
 
 /**
@@ -211,12 +190,6 @@ export function resolveTier(setting) {
   // saved by an older build.
   if (setting && TIERS[setting]) return TIERS[setting];
   return TIERS[detectTier()];
-}
-
-/** The tier one step cheaper, or null at the bottom. */
-export function lowerTier(id) {
-  const i = TIER_ORDER.indexOf(id);
-  return i > 0 ? TIERS[TIER_ORDER[i - 1]] : null;
 }
 
 /** @type {Tier|null} */
