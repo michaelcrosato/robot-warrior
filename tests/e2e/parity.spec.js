@@ -21,12 +21,29 @@ const baseline = JSON.parse(
   readFileSync(new URL('./__baseline__/original.json', import.meta.url), 'utf8'),
 );
 
-/** Collect page errors and console errors for the whole test. */
+/**
+ * Collect page errors and console errors for the whole test.
+ *
+ * One category is filtered out: requests for `audio/music/*`. Those three tracks are
+ * deliberately not distributed with the source (docs/assets.md), so on a fresh clone —
+ * and therefore in CI, and on the published site — the browser logs a network 404 for
+ * each. JavaScript cannot suppress a network-level log, and whether it lands before or
+ * after an assertion depends on timing, so treating it as a failure makes the suite
+ * flaky for behaviour that is working exactly as intended. Everything else still fails.
+ */
 function watchErrors(page) {
   const errors = [];
+  const isAbsentSoundtrack = (url) => /\/audio\/music\/[^/]+$/.test(url || '');
+
   page.on('pageerror', (e) => errors.push('pageerror: ' + (e.message || e)));
   page.on('console', (m) => {
-    if (m.type() === 'error') errors.push('console.error: ' + m.text());
+    if (m.type() !== 'error') return;
+    if (isAbsentSoundtrack(m.location()?.url)) return;
+    errors.push('console.error: ' + m.text());
+  });
+  page.on('requestfailed', (r) => {
+    if (isAbsentSoundtrack(r.url())) return;
+    errors.push('requestfailed: ' + r.url() + ' ' + (r.failure()?.errorText ?? ''));
   });
   return errors;
 }
@@ -133,6 +150,37 @@ test.describe('unpacked build matches the original', () => {
     });
     expect(hudInk, 'the HUD canvas must have been drawn to').toBeGreaterThan(0);
 
+    expect(errors).toEqual([]);
+  });
+
+  test('accounts for every soundtrack cue, present or absent', async ({ page }) => {
+    // The soundtrack is an optional local asset. Whichever way it goes, the game must
+    // reach 'playing' and must *report* what happened rather than failing quietly — a
+    // cue that is neither loaded nor listed as failed would mean a loader that silently
+    // gave up. This test is deliberately written to pass both with the tracks present
+    // and without them, because both are normal states for this repository.
+    const errors = watchErrors(page);
+    await page.goto('/');
+    await waitForBoot(page);
+    await page.click('#startBtn');
+    await page.waitForFunction(() => window.RobotWarrior.getStatus().state === 'playing');
+    // Give the fetches time to resolve or 404.
+    await page.waitForTimeout(6000);
+
+    const audio = await page.evaluate(() => window.RobotWarrior.getStatus().audio);
+    const loaded = audio.loaded ?? [];
+    const failed = audio.failed ?? [];
+    const cues = ['boot', 'basin', 'works'];
+
+    for (const cue of cues) {
+      expect(
+        loaded.includes(cue) || failed.includes(cue),
+        `cue "${cue}" was neither loaded nor reported as unavailable`,
+      ).toBe(true);
+    }
+
+    // Absent music must not stop the mission.
+    expect(await page.evaluate(() => window.RobotWarrior.getStatus().state)).toBe('playing');
     expect(errors).toEqual([]);
   });
 
