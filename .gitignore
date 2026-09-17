@@ -27,6 +27,7 @@ blob-report/
 tests/e2e/__baseline__/*.local.json
 
 # --- Environment / editor ----------------------------------------------------
+# .env.local is written by `vercel link` and carries a short-lived OIDC token.
 .env
 .env.*
 !.env.example
@@ -42,3 +43,9 @@ pnpm-debug.log*
 
 # One-shot migration tooling used to unpack the original single-file build.
 /.migration/
+
+# --- Deployment --------------------------------------------------------------
+# Local link to the Vercel project (ids and a cached token). The deployment itself
+# is driven by the Git integration and by vercel.json, both of which are tracked.
+.vercel/
+

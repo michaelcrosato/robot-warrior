@@ -164,6 +164,13 @@ without reaching into modules. `tests/e2e/` is built entirely on it.
 Enhanced Imaging is a second render pass with a wireframe tint, which is why
 `pass.imagingPass` and `pass.wireTint` are shared rather than local.
 
+## Deployment
+
+Published from `main` to GitHub Pages and to Vercel. The two differ only in base path —
+`/robot-warrior/` and `/`. `vite.config.js` takes it from `PUBLIC_BASE`, and every audio
+URL is built from `import.meta.env.BASE_URL`, which is why none are written as absolute
+paths. See [deployment.md](deployment.md).
+
 ## Verification
 
 ```bash

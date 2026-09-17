@@ -58,6 +58,10 @@ Two of them, and they will save you a debugging session:
 2. **[docs/adr/](docs/adr/README.md)** — why things are the way they are. If you are
    about to reverse a decision, there is probably a record explaining the cost.
 
+For anything touching the build output or asset URLs, also read
+[docs/deployment.md](docs/deployment.md): the site ships to two hosts on different base
+paths, so a hard-coded absolute asset path works on one and 404s on the other.
+
 ## Things that will bite you
 
 These are not style preferences. Each one has already caused a real failure here.

@@ -1,0 +1,5 @@
+# pnpm 12 moved package-level settings out of package.json ("the pnpm field in
+# package.json is no longer read"). esbuild is the only dependency with a build script,
+# and Vite needs it compiled, so it is allowed explicitly rather than by blanket approval.
+onlyBuiltDependencies:
+  - esbuild

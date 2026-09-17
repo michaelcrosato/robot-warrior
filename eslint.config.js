@@ -13,6 +13,8 @@ export default [
       'test-results/**',
       'RobotWarrior.html',
       '.migration/**',
+      // `vercel build` writes a copy of the production bundle here.
+      '.vercel/**',
     ],
   },
 

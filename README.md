@@ -6,7 +6,7 @@
 WebGL renderer, canvas cockpit, offline solo campaign, four-pilot online co-op.
 No engine. No framework. No runtime dependencies.
 
-[**▶ Play it**](https://michaelcrosato.github.io/robot-warrior/) · [Architecture](docs/architecture.md) · [Decisions](docs/adr/README.md) · [For agents](AGENTS.md)
+[**▶ Play it**](https://michaelcrosato.github.io/robot-warrior/) · [mirror](https://robot-warrior.vercel.app) · [Architecture](docs/architecture.md) · [Decisions](docs/adr/README.md) · [For agents](AGENTS.md)
 
 [![CI](https://github.com/michaelcrosato/robot-warrior/actions/workflows/ci.yml/badge.svg)](https://github.com/michaelcrosato/robot-warrior/actions/workflows/ci.yml)
 [![Pages](https://github.com/michaelcrosato/robot-warrior/actions/workflows/pages.yml/badge.svg)](https://github.com/michaelcrosato/robot-warrior/actions/workflows/pages.yml)
@@ -186,6 +186,10 @@ build → end-to-end. About a minute.
 | `pnpm test`         | 57 unit tests over the pure layers (Node) |
 | `pnpm test:e2e`     | Drives the real game in headless Chromium |
 | `pnpm assets:check` | Audio manifest against disk               |
+
+Published from `main` to both [GitHub Pages](https://michaelcrosato.github.io/robot-warrior/)
+and [Vercel](https://robot-warrior.vercel.app). They differ only in base path, which the
+build takes from `PUBLIC_BASE` — see [docs/deployment.md](docs/deployment.md).
 
 Types come from JSDoc on plain JavaScript, checked with `tsc --noEmit`. There are no
 `.ts` files.

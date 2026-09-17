@@ -1,5 +1,6 @@
 dist/
 dist-single/
+.vercel/
 coverage/
 assets/
 pnpm-lock.yaml
