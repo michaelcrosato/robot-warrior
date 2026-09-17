@@ -1,0 +1,435 @@
+{
+  "capturedFrom": "RobotWarrior.html (original single-file build)",
+  "note": "Reference behaviour for the unpacked source. Regenerate with pnpm run baseline.",
+  "boot": {
+    "version": "4.0.0",
+    "status": {
+      "state": "menu",
+      "audio": {
+        "cue": null,
+        "loop": false
+      },
+      "chassis": "warden",
+      "sector": "basin",
+      "imaging": false,
+      "nightVision": false,
+      "shielded": true,
+      "serviceUsed": false,
+      "supplyUsed": false,
+      "linkProgress": 0,
+      "linkDuration": 40,
+      "linkStatus": "LOCKED",
+      "linkWave": 0,
+      "linkBlocked": false,
+      "responseRemaining": 0,
+      "gateLocked": true,
+      "extractionProgress": 0,
+      "basinDefenders": 5,
+      "navIndex": 0,
+      "position": {
+        "x": 0,
+        "y": 3,
+        "z": 92
+      },
+      "speed": 0,
+      "heat": 0,
+      "armor": 1,
+      "ammo": 60,
+      "missiles": 40,
+      "objectiveLabels": [
+        "relay",
+        "uplink",
+        "basinClear",
+        "needlePass",
+        "reactor",
+        "blackglassRidge",
+        "skyguard",
+        "flightCodes"
+      ],
+      "objectives": [false, false, false, false, false, false, false, false],
+      "kills": 0,
+      "score": 0,
+      "entities": [
+        {
+          "name": "RELAY TOWER",
+          "type": "tower",
+          "zone": "basin",
+          "x": -95,
+          "z": -435,
+          "alive": true,
+          "health": 1
+        },
+        {
+          "name": "UPLINK STATION",
+          "type": "uplink",
+          "zone": "basin",
+          "x": 140,
+          "z": -745,
+          "alive": true,
+          "health": 1
+        },
+        {
+          "name": "HOUND 01",
+          "type": "mech",
+          "zone": "basin",
+          "x": -42,
+          "z": -176,
+          "alive": true,
+          "health": 1
+        },
+        {
+          "name": "HOUND 02",
+          "type": "mech",
+          "zone": "basin",
+          "x": 118,
+          "z": -354,
+          "alive": true,
+          "health": 1
+        },
+        {
+          "name": "BASTION 03",
+          "type": "mech",
+          "zone": "basin",
+          "x": 60,
+          "z": -620,
+          "alive": true,
+          "health": 1
+        },
+        {
+          "name": "SENTRY 04",
+          "type": "turret",
+          "zone": "basin",
+          "x": -72,
+          "z": -396,
+          "alive": true,
+          "health": 1
+        },
+        {
+          "name": "SENTRY 05",
+          "type": "turret",
+          "zone": "basin",
+          "x": 186,
+          "z": -701,
+          "alive": true,
+          "health": 1
+        },
+        {
+          "name": "WEST POWER FEED",
+          "type": "generator",
+          "zone": "works",
+          "x": -105,
+          "z": -1870,
+          "alive": true,
+          "health": 1
+        },
+        {
+          "name": "EAST POWER FEED",
+          "type": "generator",
+          "zone": "works",
+          "x": 240,
+          "z": -1950,
+          "alive": true,
+          "health": 1
+        },
+        {
+          "name": "ASHFALL REACTOR",
+          "type": "reactor",
+          "zone": "works",
+          "x": 65,
+          "z": -2110,
+          "alive": true,
+          "health": 1
+        },
+        {
+          "name": "WORKS GUARD 09",
+          "type": "mech",
+          "zone": "works",
+          "x": 30,
+          "z": -1850,
+          "alive": true,
+          "health": 1
+        },
+        {
+          "name": "IRON GUARD 10",
+          "type": "mech",
+          "zone": "works",
+          "x": 130,
+          "z": -2040,
+          "alive": true,
+          "health": 1
+        },
+        {
+          "name": "WORKS GUARD 11",
+          "type": "mech",
+          "zone": "works",
+          "x": -105,
+          "z": -2140,
+          "alive": true,
+          "health": 1
+        },
+        {
+          "name": "WORKS SENTRY 12",
+          "type": "turret",
+          "zone": "works",
+          "x": -42,
+          "z": -1770,
+          "alive": true,
+          "health": 1
+        },
+        {
+          "name": "WORKS SENTRY 13",
+          "type": "turret",
+          "zone": "works",
+          "x": 300,
+          "z": -2050,
+          "alive": true,
+          "health": 1
+        },
+        {
+          "name": "SKYGUARD BATTERY",
+          "type": "turret",
+          "zone": "ridge",
+          "x": -115,
+          "z": -3230,
+          "alive": true,
+          "health": 1
+        },
+        {
+          "name": "RIDGE HOUND 14",
+          "type": "mech",
+          "zone": "ridge",
+          "x": -30,
+          "z": -3100,
+          "alive": true,
+          "health": 1
+        },
+        {
+          "name": "RIDGE GUARD 15",
+          "type": "mech",
+          "zone": "ridge",
+          "x": 240,
+          "z": -3360,
+          "alive": true,
+          "health": 1
+        },
+        {
+          "name": "RIDGE SENTRY 16",
+          "type": "turret",
+          "zone": "ridge",
+          "x": -240,
+          "z": -3430,
+          "alive": true,
+          "health": 1
+        }
+      ]
+    },
+    "coopKeys": [
+      "error",
+      "held",
+      "history",
+      "hostId",
+      "id",
+      "links",
+      "localMenu",
+      "mode",
+      "players",
+      "room",
+      "session",
+      "snapshot",
+      "started"
+    ]
+  },
+  "mission": {
+    "state": "playing",
+    "sector": "basin",
+    "chassis": "warden",
+    "objectiveLabels": [
+      "relay",
+      "uplink",
+      "basinClear",
+      "needlePass",
+      "reactor",
+      "blackglassRidge",
+      "skyguard",
+      "flightCodes"
+    ],
+    "objectives": [false, false, false, false, false, false, false, false],
+    "armor": 1,
+    "ammo": 60,
+    "missiles": 40,
+    "entities": [
+      {
+        "name": "ASHFALL REACTOR",
+        "type": "reactor",
+        "zone": "works",
+        "x": 65,
+        "z": -2110,
+        "alive": true,
+        "health": 1
+      },
+      {
+        "name": "BASTION 03",
+        "type": "mech",
+        "zone": "basin",
+        "x": 60,
+        "z": -620,
+        "alive": true,
+        "health": 1
+      },
+      {
+        "name": "EAST POWER FEED",
+        "type": "generator",
+        "zone": "works",
+        "x": 240,
+        "z": -1950,
+        "alive": true,
+        "health": 1
+      },
+      {
+        "name": "HOUND 01",
+        "type": "mech",
+        "zone": "basin",
+        "x": -46,
+        "z": -158,
+        "alive": true,
+        "health": 1
+      },
+      {
+        "name": "HOUND 02",
+        "type": "mech",
+        "zone": "basin",
+        "x": 118,
+        "z": -354,
+        "alive": true,
+        "health": 1
+      },
+      {
+        "name": "IRON GUARD 10",
+        "type": "mech",
+        "zone": "works",
+        "x": 130,
+        "z": -2040,
+        "alive": true,
+        "health": 1
+      },
+      {
+        "name": "RELAY TOWER",
+        "type": "tower",
+        "zone": "basin",
+        "x": -95,
+        "z": -435,
+        "alive": true,
+        "health": 1
+      },
+      {
+        "name": "RIDGE GUARD 15",
+        "type": "mech",
+        "zone": "ridge",
+        "x": 240,
+        "z": -3360,
+        "alive": true,
+        "health": 1
+      },
+      {
+        "name": "RIDGE HOUND 14",
+        "type": "mech",
+        "zone": "ridge",
+        "x": -30,
+        "z": -3100,
+        "alive": true,
+        "health": 1
+      },
+      {
+        "name": "RIDGE SENTRY 16",
+        "type": "turret",
+        "zone": "ridge",
+        "x": -240,
+        "z": -3430,
+        "alive": true,
+        "health": 1
+      },
+      {
+        "name": "SENTRY 04",
+        "type": "turret",
+        "zone": "basin",
+        "x": -72,
+        "z": -396,
+        "alive": true,
+        "health": 1
+      },
+      {
+        "name": "SENTRY 05",
+        "type": "turret",
+        "zone": "basin",
+        "x": 186,
+        "z": -701,
+        "alive": true,
+        "health": 1
+      },
+      {
+        "name": "SKYGUARD BATTERY",
+        "type": "turret",
+        "zone": "ridge",
+        "x": -115,
+        "z": -3230,
+        "alive": true,
+        "health": 1
+      },
+      {
+        "name": "UPLINK STATION",
+        "type": "uplink",
+        "zone": "basin",
+        "x": 140,
+        "z": -745,
+        "alive": true,
+        "health": 1
+      },
+      {
+        "name": "WEST POWER FEED",
+        "type": "generator",
+        "zone": "works",
+        "x": -105,
+        "z": -1870,
+        "alive": true,
+        "health": 1
+      },
+      {
+        "name": "WORKS GUARD 09",
+        "type": "mech",
+        "zone": "works",
+        "x": 30,
+        "z": -1850,
+        "alive": true,
+        "health": 1
+      },
+      {
+        "name": "WORKS GUARD 11",
+        "type": "mech",
+        "zone": "works",
+        "x": -105,
+        "z": -2140,
+        "alive": true,
+        "health": 1
+      },
+      {
+        "name": "WORKS SENTRY 12",
+        "type": "turret",
+        "zone": "works",
+        "x": -42,
+        "z": -1770,
+        "alive": true,
+        "health": 1
+      },
+      {
+        "name": "WORKS SENTRY 13",
+        "type": "turret",
+        "zone": "works",
+        "x": 300,
+        "z": -2050,
+        "alive": true,
+        "health": 1
+      }
+    ]
+  },
+  "originalErrors": []
+}
