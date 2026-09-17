@@ -52,14 +52,21 @@ async function pointer(page, selector, type, x, y, pointerId = 7) {
   );
 }
 
+/**
+ * Start a mission and wait for the boot sequence to finish.
+ *
+ * The startup sequence is paced by the boot audio cue, and when that file is absent — the
+ * normal state of a fresh clone, so also of CI — it falls back to a wall-clock timer of
+ * about 8.5 seconds. The wait is generous because that is real time on top of however long
+ * a shared runner takes to render the first frames.
+ */
 async function startMission(page) {
   await page.goto('/');
   await waitForBoot(page);
   await page.click('#startBtn');
   await page.waitForFunction(() => window.RobotWarrior.getStatus().state === 'playing', null, {
-    timeout: 30_000,
+    timeout: 60_000,
   });
-  await page.waitForTimeout(800);
 }
 
 test.describe('touch controls', () => {
@@ -105,16 +112,24 @@ test.describe('touch controls', () => {
 
     await pointer(page, '#touchStick', 'pointerdown', stick.x, stick.y);
     await pointer(page, '#touchStick', 'pointermove', stick.x, stick.y - 44);
-    await page.waitForTimeout(1500);
+
+    // Wait for the mech to have actually travelled rather than for a fixed slice of wall
+    // clock. How far it gets in a second depends on the frame rate, which on a shared CI
+    // runner rendering through SwiftShader is not something this test should assert.
+    await page.waitForFunction(
+      (from) => {
+        const p = window.RobotWarrior.getStatus().position;
+        return Math.hypot(p.x - from.x, p.z - from.z) > 3;
+      },
+      before,
+      { timeout: 30_000 },
+    );
 
     const status = await page.evaluate(() => window.RobotWarrior.getStatus());
-    expect(status.speed, 'pushing the stick forward must move the mech').toBeGreaterThan(5);
+    expect(status.speed, 'pushing the stick forward must move the mech').toBeGreaterThan(1);
     expect(await page.textContent('#stickReadout')).toMatch(/\d+%/);
 
     await pointer(page, '#touchStick', 'pointerup', stick.x, stick.y - 44);
-
-    const after = await page.evaluate(() => window.RobotWarrior.getStatus().position);
-    expect(Math.hypot(after.x - before.x, after.z - before.z)).toBeGreaterThan(3);
   });
 
   test('dragging swings the torso', async ({ page }) => {
@@ -128,8 +143,14 @@ test.describe('touch controls', () => {
       await pointer(page, '#touchAim', 'pointermove', aim.x + i * 12, aim.y, 8);
     }
     await pointer(page, '#touchAim', 'pointerup', aim.x + 120, aim.y, 8);
-    await page.waitForTimeout(300);
 
+    // The torso is written straight from the drag, so this needs no frames to pass — but
+    // waiting on the value rather than a timer keeps it honest on a slow runner.
+    await page.waitForFunction(
+      (from) => window.RobotWarrior.getStatus().torso > from + 0.1,
+      before.torso,
+      { timeout: 15_000 },
+    );
     const after = await page.evaluate(() => window.RobotWarrior.getStatus());
     expect(after.torso, 'dragging right must swing the torso right').toBeGreaterThan(
       before.torso + 0.1,
@@ -141,8 +162,11 @@ test.describe('touch controls', () => {
       await pointer(page, '#touchAim', 'pointermove', aim.x - i * 12, aim.y, 11);
     }
     await pointer(page, '#touchAim', 'pointerup', aim.x - 120, aim.y, 11);
-    await page.waitForTimeout(300);
-
+    await page.waitForFunction(
+      (from) => window.RobotWarrior.getStatus().torso < from - 0.1,
+      after.torso,
+      { timeout: 15_000 },
+    );
     const back = await page.evaluate(() => window.RobotWarrior.getStatus());
     expect(back.torso, 'dragging left must swing it back').toBeLessThan(after.torso - 0.1);
   });
@@ -155,7 +179,10 @@ test.describe('touch controls', () => {
 
     const weapon = await centre(page, '[data-touch="weapon"][data-index="2"]');
     await page.touchscreen.tap(weapon.x, weapon.y);
-    await page.waitForTimeout(300);
+    await page.waitForFunction(() => window.RobotWarrior.getStatus().state === 'playing', null, {
+      timeout: 15_000,
+    });
+    await page.waitForTimeout(250);
 
     const selected = await page.evaluate(() => {
       const el = /** @type {HTMLElement|null} */ (
@@ -178,7 +205,9 @@ test.describe('touch controls', () => {
     const before = await page.evaluate(() => window.RobotWarrior.getStatus().ammo);
     const fire = await centre(page, '[data-touch="fire"]');
     await pointer(page, '[data-touch="fire"]', 'pointerdown', fire.x, fire.y, 10);
-    await page.waitForTimeout(900);
+    await page.waitForFunction((from) => window.RobotWarrior.getStatus().ammo < from, before, {
+      timeout: 30_000,
+    });
     await pointer(page, '[data-touch="fire"]', 'pointerup', fire.x, fire.y, 10);
 
     const after = await page.evaluate(() => window.RobotWarrior.getStatus().ammo);
