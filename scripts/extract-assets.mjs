@@ -112,11 +112,27 @@ export const VOICE_CLIPS = ${JSON.stringify(
 const MUSIC_EXT = Object.fromEntries(MUSIC_CLIPS.map((c) => [c.key, c.ext]));
 
 /**
+ * Clips inlined as data URLs by the offline single-file build.
+ *
+ * fetch() accepts a data URL, so the loaders need no special case: the offline
+ * bundle installs this map and every clip resolves without a network request.
+ * Undefined in a normal build.
+ *
+ * @type {Record<string, string> | undefined}
+ */
+const INLINE = /** @type {any} */ (globalThis).__ROBOTWARRIOR_ASSETS__;
+
+/** @param {string} assetPath */
+function resolve(assetPath) {
+  return INLINE?.[assetPath] ?? BASE + assetPath;
+}
+
+/**
  * URL for a soundtrack cue.
  * @param {string} key
  */
 export function musicUrl(key) {
-  return \`\${BASE}audio/music/\${key}.\${MUSIC_EXT[key] ?? 'mp3'}\`;
+  return resolve(\`audio/music/\${key}.\${MUSIC_EXT[key] ?? 'mp3'}\`);
 }
 
 /**
@@ -124,7 +140,7 @@ export function musicUrl(key) {
  * @param {Clip} clip
  */
 export function voiceUrl(clip) {
-  return \`\${BASE}audio/voice/\${clip.key}.\${clip.ext}\`;
+  return resolve(\`audio/voice/\${clip.key}.\${clip.ext}\`);
 }
 `;
 

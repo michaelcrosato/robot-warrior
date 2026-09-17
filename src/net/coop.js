@@ -1233,17 +1233,15 @@ export class LanceCoop {
       banner: G.sectorBanner,
       players: [...this.members.values()].map((r) => this.snapshotPlayer(r)),
       entities: pools.entities.map((e) => this.snapshotEntity(e)),
-      projectiles: pools.projectiles
-        .slice(-100)
-        .map((p) => ({
-          id: p.netId || (p.netId = ++this.projectileId),
-          p: p.p,
-          v: p.v,
-          type: p.type,
-          friendly: p.friendly,
-          life: p.life,
-          color: p.color,
-        })),
+      projectiles: pools.projectiles.slice(-100).map((p) => ({
+        id: p.netId || (p.netId = ++this.projectileId),
+        p: p.p,
+        v: p.v,
+        type: p.type,
+        friendly: p.friendly,
+        life: p.life,
+        color: p.color,
+      })),
       events: this.events.slice(-80),
     };
     this.broadcast(packet, false);
