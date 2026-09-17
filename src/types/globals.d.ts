@@ -19,14 +19,26 @@ export interface StatusEntity {
   health: number;
 }
 
-/** Soundtrack playback state. */
+/**
+ * Soundtrack playback state, as MissionSoundtrack.status() reports it.
+ *
+ * `loaded` and `failed` are the two fields worth reading when debugging silence: a cue
+ * should always appear in one of them. Music is an optional local asset, so a cue in
+ * `failed` is an ordinary outcome, not a bug — see docs/assets.md.
+ */
 export interface AudioStatus {
   cue: string | null;
-  title?: string | null;
-  playing?: boolean;
-  position?: number;
-  duration?: number;
-  loop?: boolean;
+  title: string | null;
+  playing: boolean;
+  paused: boolean;
+  /** Seconds into the current cue. */
+  position: number;
+  duration: number;
+  loop: boolean;
+  /** Cue keys whose audio decoded successfully. */
+  loaded: string[];
+  /** Cue keys that could not be fetched or decoded. */
+  failed: string[];
 }
 
 /** A full snapshot of mission and pilot state. */
