@@ -54,5 +54,14 @@ spawned in the wrong place, or in the wrong sector.
   the committed baseline is what is compared against, and it should not be regenerated
   casually: doing so replaces the reference with current behaviour, which hides exactly
   what it exists to catch.
+- **The suite asserts invariants, never performance or timing.** This was learned three
+  times over, each time as a CI failure that passed locally: exact entity coordinates
+  (mechs walk, and how far depends on frame rate), zero console errors (an absent optional
+  asset logs a network 404 that JavaScript cannot suppress), and a frame-rate floor
+  (SwiftShader on a contended runner can fall below any figure). All three were assertions
+  about the machine rather than about the game. A parity suite that fails intermittently is
+  worse than a smaller one that never does, because the first thing anyone learns is to
+  re-run it. Frame rate is now logged for visibility and asserted only as "greater than
+  zero"; a real performance budget belongs in a separate, non-blocking benchmark.
 - Keep this suite passing through future refactors. The next obvious change — splitting
   `G` per [0002](0002-shared-state-as-namespace-objects.md) — depends on it.

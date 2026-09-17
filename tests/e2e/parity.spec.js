@@ -133,11 +133,15 @@ test.describe('unpacked build matches the original', () => {
     await page.click('#startBtn');
     await page.waitForFunction(() => window.RobotWarrior.getStatus().state === 'playing');
 
-    const { after } = await measureFrames(page, 2500);
-    expect(after, 'the render loop must be producing frames').toBeGreaterThan(5);
+    const { before, after, advanced } = await measureFrames(page, 2500);
+    console.log(`loop: ${before.fps} -> ${after.fps} fps, ${advanced.toFixed(2)}s of mission time`);
 
-    const advanced = await page.evaluate(() => window.RobotWarrior.getStatus().time);
-    expect(advanced, 'mission time must advance').toBeGreaterThan(0);
+    // The loop must be advancing. No figure is asserted: this runs on SwiftShader, and a
+    // contended runner can legitimately drop below any threshold — a `> 5` assertion here
+    // was flaky for exactly that reason. Zero frames, or a frozen clock, still fails.
+    expect(after.fps, 'frames must be being counted').toBeGreaterThan(0);
+    expect(advanced, 'mission time must advance while the loop runs').toBeGreaterThan(0);
+    expect(after.time, 'the mission clock must be running').toBeGreaterThan(before.time);
 
     // The HUD is drawn to its own 2D canvas; a blank canvas means the HUD pass died.
     const hudInk = await page.evaluate(() => {

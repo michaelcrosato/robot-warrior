@@ -123,13 +123,30 @@ export async function probeMission(page) {
 }
 
 /**
- * Assert the render loop is actually producing frames rather than sitting at a
- * black screen with a live status object.
+ * Sample the loop twice to show it is advancing.
+ *
+ * Deliberately reports progress rather than speed. The e2e suite runs on SwiftShader —
+ * software rasterisation of a full WebGL scene — so the frame rate on a contended CI
+ * runner is not bounded by anything this repository controls, and asserting a specific
+ * figure made the suite flaky. What matters for correctness is that the mission clock
+ * moves and frames are being counted at all; how fast belongs in a benchmark, not a gate.
+ *
  * @param {import('@playwright/test').Page} page
+ * @param {number} ms how long to sample for
  */
 export async function measureFrames(page, ms = 2000) {
-  const before = await page.evaluate(() => window.RobotWarrior.getStatus().fps);
+  const sample = () =>
+    page.evaluate(() => {
+      const s = window.RobotWarrior.getStatus();
+      return { fps: s.fps, time: s.time };
+    });
+  const before = await sample();
   await page.waitForTimeout(ms);
-  const after = await page.evaluate(() => window.RobotWarrior.getStatus().fps);
-  return { before, after };
+  const after = await sample();
+  return {
+    before,
+    after,
+    /** Seconds of mission time that elapsed while sampling. */
+    advanced: after.time - before.time,
+  };
 }
