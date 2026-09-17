@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta name="theme-color" content="#171b1b" />
+    <meta
+      name="description"
+      content="RobotWarrior: a single-file heavy robot combat game with offline solo play and online co-op for up to four pilots. Operation Iron Echo: Kestrel Basin, Ashfall Works, and Blackglass Ridge. Three pilotable mechs. Enhanced Imaging."
+    />
+    <title>RobotWarrior — Four-Pilot Co-op / Iron Echo</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cpath d='M4 12 20 3 36 12v17l-16 9L4 29Z M10 15l10-5 10 5-3 15-7 4-7-4Z M11 18h18M16 18l1 7h6l1-7M17 29h6' fill='none' stroke='%23f58b51' stroke-width='1.8'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="/src/styles/game.css" />
+    <noscript
+      ><style>
+        #loading {
+          display: none !important;
+        }
+        #noscript {
+          position: absolute;
+          inset: 0;
+          z-index: 99;
+          display: grid;
+          place-content: center;
+          gap: 10px;
+          text-align: center;
+          padding: 8vw;
+          font-size: 12px;
+          letter-spacing: 1.6px;
+          background: #171d22;
+          color: #e5e0cf;
+        }
+      </style></noscript
+    >
+  </head>
+  <body>
+    <canvas id="world" aria-label="RobotWarrior 3D game view"></canvas>
+    <canvas id="hud" aria-hidden="true"></canvas>
+    <div id="vignette"></div>
+    <div id="grain"></div>
+    <div id="loading"><strong>ROBOTWARRIOR</strong><span>INITIALIZING COMBAT SYSTEMS</span></div>
+    <div id="menu">
+      <header class="topbar">
+        <div class="brand">
+          <svg viewBox="0 0 40 40" aria-hidden="true">
+            <path
+              d="M4 12 20 3 36 12v17l-16 9L4 29Z M10 15l10-5 10 5-3 15-7 4-7-4Z M11 18h18M16 18l1 7h6l1-7M17 29h6"
+            /></svg
+          >ROBOTWARRIOR
+        </div>
+        <div class="top-status">
+          <span>TACTICAL COMBAT SYSTEM / R.04.0</span
+          ><span><i class="status-dot"></i>SYSTEM READY</span>
+        </div>
+      </header>
+      <main class="menu-main">
+        <div class="eyebrow" id="menuEyebrow">70 TONS. ONE PILOT.</div>
+        <h1>ROBOT<span>WARRIOR</span></h1>
+        <p class="subtitle">
+          Cut the signal. Break the reactor.<br />Cross Blackglass Ridge.<br />Hold the link. Open
+          the flight path.
+        </p>
+        <div class="chassis-switch" aria-label="Choose your mech">
+          <button class="chassis-choice" data-chassis="kestrel" aria-pressed="false">
+            <small>KST—40 / SCOUT</small><b>KESTREL</b><span>40 T · 116 KM/H</span>
+          </button>
+          <button class="chassis-choice active" data-chassis="warden" aria-pressed="true">
+            <small>WRD—70 / HEAVY</small><b>WARDEN</b><span>70 T · 80 KM/H</span>
+          </button>
+          <button class="chassis-choice" data-chassis="bastion" aria-pressed="false">
+            <small>BST—95 / ASSAULT</small><b>BASTION</b><span>95 T · 60 KM/H</span>
+          </button>
+        </div>
+        <div class="menu-selected-note" id="menuMechNote">
+          Balanced armor and firepower. Four-missile volleys. Standard jump jets.
+        </div>
+        <div class="actions">
+          <button class="button primary" id="startBtn">DEPLOY <span>↗</span></button
+          ><button class="button" id="briefBtn">MISSION &amp; HANGAR</button
+          ><button class="button" id="coopOpen">ONLINE CO-OP <span> / 1—4</span></button>
+        </div>
+        <button class="text-button" id="manualBtn">[ H ] &nbsp; FIELD MANUAL</button>
+        <div class="menu-hint">KEYBOARD + MOUSE &nbsp; / &nbsp; HEADPHONES RECOMMENDED</div>
+        <div id="touchWarn">This game needs a keyboard and mouse.</div>
+      </main>
+      <div class="hero-tag">
+        <strong id="heroCode">WRD—70</strong><span id="heroClass">WARDEN / HEAVY CLASS</span>
+      </div>
+      <div class="hero-caption">
+        <b>REACTOR: STABLE</b><span id="heroWeapons">DUAL PULSE / COIL CANNON / MISSILES</span
+        ><br /><span id="heroMobility">JUMP CAPABLE · 80 KM/H</span><br /><span
+          class="expansion-chip"
+          >03 SECTORS / ENHANCED IMAGING</span
+        >
+      </div>
+      <footer class="footbar">
+        <div class="specs">
+          <div class="spec">
+            <span>CHASSIS</span><strong id="menuChassis">WARDEN / 70 T</strong>
+          </div>
+          <div class="spec"><span>LOADOUT</span><strong id="menuLoadout">BALANCED</strong></div>
+          <div class="spec"><span>DEPLOYMENT</span><strong>SINGLE PILOT</strong></div>
+        </div>
+        <div class="mission-tag">
+          <small>OPERATION 01 / IRON ECHO</small>
+          <p>KESTREL → ASHFALL → BLACKGLASS</p>
+        </div>
+      </footer>
+    </div>
+    <section class="overlay" id="brief" hidden aria-label="Mission and loadout">
+      <div class="panel">
+        <header class="panel-header">
+          <span>OPERATIONS / MISSION 01</span
+          ><button class="close" data-close="brief" aria-label="Close mission brief">×</button>
+        </header>
+        <div class="panel-body">
+          <div class="hangar-strip">
+            <div>
+              <div class="section-label">SELECT COMBAT MACHINE</div>
+              <div class="chassis-switch" aria-label="Choose your mech">
+                <button class="chassis-choice" data-chassis="kestrel" aria-pressed="false">
+                  <small>KST—40 / SCOUT</small><b>KESTREL</b><span>40 T · 116 KM/H</span>
+                </button>
+                <button class="chassis-choice active" data-chassis="warden" aria-pressed="true">
+                  <small>WRD—70 / HEAVY</small><b>WARDEN</b><span>70 T · 80 KM/H</span>
+                </button>
+                <button class="chassis-choice" data-chassis="bastion" aria-pressed="false">
+                  <small>BST—95 / ASSAULT</small><b>BASTION</b><span>95 T · 60 KM/H</span>
+                </button>
+              </div>
+            </div>
+            <div>
+              <div class="section-label" id="chassisStatLine">WARDEN / 70 T / 80 KM/H</div>
+              <p id="chassisSummary"></p>
+            </div>
+          </div>
+          <div class="brief-grid">
+            <div>
+              <div class="eyebrow">KESTREL BASIN · 05:40 LOCAL</div>
+              <h2 style="margin-top: 16px">IRON ECHO</h2>
+              <p>
+                Clear Kestrel Basin. Cross Needle Pass and destroy the Ashfall reactor. Its power
+                feeds the gate to Blackglass Ridge. Disable the ridge air-defense battery, then
+                secure the flight-control codes so the transport can reach you. Two repair bays
+                support the route.
+              </p>
+              <div class="section-label">MISSION OBJECTIVES</div>
+              <div class="objective">
+                <span>01</span>
+                <div>Destroy the relay tower.<small>NAV ALPHA · Northern ridge</small></div>
+              </div>
+              <div class="objective">
+                <span>02</span>
+                <div>Destroy the uplink station.<small>NAV BRAVO · Basin command site</small></div>
+              </div>
+              <div class="objective">
+                <span>03</span>
+                <div>
+                  Clear the basin. Cross Needle Pass.<small
+                    >NAV CHARLIE · Repair bay on the route</small
+                  >
+                </div>
+              </div>
+              <div class="objective">
+                <span>04</span>
+                <div>
+                  Cut both power feeds. Destroy the reactor.<small
+                    >NAV DELTA / ECHO / FOXTROT · Ashfall Works</small
+                  >
+                </div>
+              </div>
+              <div class="objective">
+                <span>05</span>
+                <div>
+                  Cross Cinder Cut to Blackglass Ridge.<small
+                    >NAV GOLF · Second repair bay before the gate</small
+                  >
+                </div>
+              </div>
+              <div class="objective">
+                <span>06</span>
+                <div>
+                  Destroy the Skyguard battery.<small
+                    >NAV HOTEL · Opens the flight-control link</small
+                  >
+                </div>
+              </div>
+              <div class="objective">
+                <span>07</span>
+                <div>
+                  Secure the flight-control codes.<small
+                    >NAV INDIA · Hold the link for 40 seconds. Defeat the counterattack.</small
+                  >
+                </div>
+              </div>
+              <div class="objective">
+                <span>08</span>
+                <div>
+                  Reach the north extraction zone.<small
+                    >NAV JULIET · Stop and hold for 5 seconds</small
+                  >
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="map-wrap">
+                <canvas id="briefMap" width="420" height="520"></canvas
+                ><small>THREE-SECTOR ROUTE / GRID 200 M / NORTH ↑</small>
+              </div>
+              <div class="section-label">WEAPON CONFIGURATION</div>
+              <div class="choice-row" id="loadoutChoices">
+                <button class="choice active" data-loadout="balanced">BALANCED</button
+                ><button class="choice" data-loadout="cool">COOL RUNNER</button
+                ><button class="choice" data-loadout="heavy">HEAVY GUN</button>
+              </div>
+              <p id="loadoutDesc">
+                Two pulse lasers, a coil cannon, and guided missiles. A flexible combat load with
+                two coolant charges.
+              </p>
+              <div class="section-label">DIFFICULTY</div>
+              <div class="choice-row" id="difficultyChoices">
+                <button class="choice" data-difficulty="cadet">CADET</button
+                ><button class="choice active" data-difficulty="regular">REGULAR</button
+                ><button class="choice" data-difficulty="veteran">VETERAN</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <footer class="panel-footer">
+          <small
+            >[I] Enhanced Imaging: wireframe combat view.<br />Each repair bay can repair and rearm
+            once.</small
+          ><button class="button primary" id="briefStart">DEPLOY <span>↗</span></button>
+        </footer>
+      </div>
+    </section>
+    <section class="overlay" id="manual" hidden aria-label="Field manual">
+      <div class="panel">
+        <header class="panel-header">
+          <span>FIELD MANUAL / PILOT SYSTEMS</span
+          ><button class="close" data-close="manual" aria-label="Close field manual">×</button>
+        </header>
+        <div class="panel-body">
+          <h2>KNOW YOUR MACHINE.</h2>
+          <p>
+            This is a walking tank, not a foot soldier. Set the throttle, turn the legs, then aim
+            the torso. Your speed stays set when you release the key.
+          </p>
+          <div class="manual-grid">
+            <div class="control">
+              Increase / decrease throttle <span><kbd>W</kbd> <kbd>S</kbd></span>
+            </div>
+            <div class="control">
+              Aim torso <span><kbd>MOUSE</kbd> or <kbd>ARROWS</kbd></span>
+            </div>
+            <div class="control">
+              Turn legs <span><kbd>A</kbd> <kbd>D</kbd></span>
+            </div>
+            <div class="control">
+              Fire selected weapon <span><kbd>CLICK</kbd> or <kbd>SPACE</kbd></span>
+            </div>
+            <div class="control">
+              Stop / set full throttle <span><kbd>X</kbd> / <kbd>B</kbd></span>
+            </div>
+            <div class="control">
+              Select weapon <span><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></span>
+            </div>
+            <div class="control">
+              Align legs with torso <span><kbd>C</kbd></span>
+            </div>
+            <div class="control">
+              Fire all ready weapons <span><kbd>F</kbd></span>
+            </div>
+            <div class="control">
+              Twist torso / center torso <span><kbd>Q</kbd> <kbd>E</kbd> / <kbd>HOME</kbd></span>
+            </div>
+            <div class="control">
+              Nearest / next target <span><kbd>R</kbd> / <kbd>TAB</kbd></span>
+            </div>
+            <div class="control">
+              Jump jets (hold) <span><kbd>SHIFT</kbd></span>
+            </div>
+            <div class="control">
+              Restore teammate (co-op, hold) <span><kbd>J</kbd></span>
+            </div>
+            <div class="control">
+              Coolant flush <span><kbd>G</kbd></span>
+            </div>
+            <div class="control">
+              Enhanced Imaging (wireframe) <span><kbd>I</kbd></span>
+            </div>
+            <div class="control">
+              Zoom / night vision <span><kbd>Z</kbd> / <kbd>V</kbd></span>
+            </div>
+            <div class="control">
+              Map / next waypoint <span><kbd>M</kbd> / <kbd>N</kbd></span>
+            </div>
+            <div class="control">
+              Pause / help <span><kbd>ESC</kbd> / <kbd>H</kbd></span>
+            </div>
+            <div class="control">
+              Sound / full screen <span><kbd>P</kbd> / <kbd>ALT + ENTER</kbd></span>
+            </div>
+          </div>
+          <div class="help-note">
+            <p>
+              <b>First contact:</b> Press B to move, then R to select a target. Aim at its box. Hold
+              the aim steady for missile lock. Switch weapons while they recharge. At 100% heat, the
+              reactor shuts down. Press G to cool it.
+            </p>
+          </div>
+          <div class="help-note">
+            <p>
+              <b>Extended mission:</b> Destroy both basin sites and all basin defenders. Cross NAV
+              CHARLIE. Cut both power feeds at Ashfall Works, then destroy the exposed reactor.
+              Cross Cinder Cut at NAV GOLF. Destroy the Skyguard battery at NAV HOTEL. Secure the
+              flight-control codes at NAV INDIA. Then reach NAV JULIET for extraction. Stop inside
+              each blue repair bay for 6 seconds to repair and rearm once.
+            </p>
+            <p style="margin-top: 10px">
+              <b>Flight-control link:</b> Stop inside the cyan ring at NAV INDIA. Stay on the ground
+              for a total of 40 seconds. You can turn and fire. Leaving the ring, moving, reactor
+              shutdown, or enemies within 90 meters will pause the transfer. Your progress is saved.
+              Defeat both counterattack waves to open extraction. The flight beacon cannot be
+              destroyed.
+            </p>
+            <p style="margin-top: 10px">
+              <b>Enhanced Imaging [I]:</b> Shows real mesh edges. Terrain is green. Objectives are
+              blue. Enemy armor is amber; damaged parts turn red. Solid cover still blocks the view
+              and weapons. Press I again for the normal view. Night vision [V] remains separate.
+            </p>
+          </div>
+          <div class="help-note">
+            <p>
+              <b>Online co-op:</b> Select ONLINE CO-OP. The host creates a room and shares its code.
+              Each pilot chooses a mech and selects READY. The host deploys the team. Armor,
+              ammunition, and one use of each repair bay are separate for each pilot. Mission
+              objectives and score are shared. Friendly fire is off.
+            </p>
+            <p style="margin-top: 10px">
+              <b>Teammate recovery:</b> Stop within 32 meters of a downed pilot. Hold J for 6
+              seconds to restore the mech. One pilot can hold the flight-link ring while the others
+              defend it. All living pilots must reach extraction. The mission fails if all pilots
+              are down.
+            </p>
+            <p style="margin-top: 10px">
+              <b>Local menus:</b> Esc opens your menu, but the online mission continues. Your mech
+              stops and remains vulnerable. If the host hides the game tab, the team is put on hold
+              until the host resumes. The host must keep the game open. Host migration and joining
+              after deployment are not supported.
+            </p>
+          </div>
+          <p class="credit">
+            Original game code, art, sound effects, and radio prompts. This build includes the
+            supplied audio files: 3-01 &quot;Reactor Online&quot; for startup, 1-02 Umber Wall for
+            Kestrel Basin, and 1-03 Silent Thunder after the basin is clear. Music loops during each
+            section. In solo play, pause stops playback and resume continues from the same point.
+            Online music follows the shared mission stage. Inspired by 1990s heavy robot
+            simulations. Not affiliated with MechWarrior or its rights holders. All game assets and
+            supplied audio are embedded. Solo play uses no network. Online play uses external
+            signaling and ICE services. WebRTC signaling follows the PeerJS 1.5.5 protocol. No
+            camera or microphone is used.
+          </p>
+        </div>
+        <footer class="panel-footer">
+          <small
+            >Without mouse capture, drag to aim or use the arrow keys.<br />Esc pauses solo play. In
+            co-op, the mission continues.</small
+          ><button class="button" data-close="manual">RETURN</button>
+        </footer>
+      </div>
+    </section>
+    <section class="overlay" id="pause" hidden aria-label="Pause menu">
+      <div class="panel compact">
+        <header class="panel-header"><span>COMBAT SYSTEM / PAUSED</span><span>Ⅱ</span></header>
+        <div class="panel-body">
+          <div class="pause-head">
+            <h2>HOLD POSITION.</h2>
+            <button class="button small-button" id="pauseManual">HELP</button>
+          </div>
+          <div class="settings-line">
+            <label for="volume">Master volume</label
+            ><input id="volume" type="range" min="0" max="100" value="70" />
+          </div>
+          <div class="settings-line">
+            <label for="music">Music</label
+            ><input id="music" type="range" min="0" max="100" value="35" />
+          </div>
+          <div class="settings-line">
+            <label for="sensitivity">Mouse sensitivity</label
+            ><input id="sensitivity" type="range" min="15" max="150" value="60" />
+          </div>
+          <div class="settings-line">
+            <label for="quality">Render detail</label
+            ><select id="quality">
+              <option value="retro">Retro · 640 px</option>
+              <option value="balanced" selected>Standard · 960 px</option>
+              <option value="sharp">Sharp · native</option>
+            </select>
+          </div>
+          <div class="settings-line">
+            <label for="shake">Cockpit motion</label><input id="shake" type="checkbox" checked />
+          </div>
+          <div class="settings-line">
+            <label for="enhancedView">Enhanced Imaging [I]</label
+            ><input id="enhancedView" type="checkbox" />
+          </div>
+          <div class="settings-line">
+            <label for="invert">Invert mouse Y</label><input id="invert" type="checkbox" />
+          </div>
+          <div class="pause-buttons">
+            <button class="button primary" id="resumeBtn">RESUME MISSION</button
+            ><button class="button" id="restartBtn">RESTART MISSION</button
+            ><button class="text-button" id="quitBtn">RETURN TO OPERATIONS</button>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="overlay" id="result" hidden aria-label="Mission result">
+      <div class="panel" style="max-width: 700px">
+        <header class="panel-header">
+          <span id="resultCode">MISSION DEBRIEF / 01</span><span id="resultMech">WRD—70</span>
+        </header>
+        <div class="panel-body">
+          <div class="eyebrow" id="resultEyebrow">FLIGHT PATH OPEN. MISSION COMPLETE.</div>
+          <h2 id="resultTitle" style="font-size: 58px; margin-top: 21px">BASIN SECURED.</h2>
+          <p id="resultText">
+            Both communication sites are down. Your machine is aboard the transport.
+          </p>
+          <div class="result-stats">
+            <div><span>MISSION TIME</span><strong id="resultTime">00:00</strong></div>
+            <div><span>UNITS DESTROYED</span><strong id="resultKills">0 / 6</strong></div>
+            <div><span>COMBAT SCORE</span><strong id="resultScore">0</strong></div>
+          </div>
+          <p id="resultDetail"></p>
+          <div class="actions">
+            <button class="button primary" id="againBtn">DEPLOY AGAIN <span>↗</span></button
+            ><button class="button" id="resultMenu">OPERATIONS</button>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="overlay" id="coopLobby" hidden aria-label="Online co-op lobby">
+      <div class="panel coop-panel">
+        <header class="panel-header">
+          <span>LANCE LINK / ONLINE CO-OP</span
+          ><button class="close" id="coopClose" aria-label="Close co-op lobby">×</button>
+        </header>
+        <div class="panel-body">
+          <div class="coop-heading">
+            <div>
+              <div class="eyebrow">OPERATION IRON ECHO / 01—03</div>
+              <h2>FOUR PILOTS.<br />ONE MISSION.</h2>
+            </div>
+            <div class="coop-signal">
+              <span class="status-dot"></span><b id="coopState">OFFLINE</b
+              ><small id="coopCount">UP TO 4 PLAYERS</small>
+            </div>
+          </div>
+          <div class="coop-grid">
+            <div>
+              <label class="coop-label" for="coopName">PILOT CALL SIGN</label
+              ><input
+                class="coop-input"
+                id="coopName"
+                maxlength="16"
+                placeholder="PILOT"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <label class="coop-label" for="coopChassis">YOUR MECH</label
+              ><select class="coop-input" id="coopChassis">
+                <option value="kestrel">KESTREL · 40 T · SCOUT</option>
+                <option value="warden" selected>WARDEN · 70 T · HEAVY</option>
+                <option value="bastion">BASTION · 95 T · ASSAULT</option>
+              </select>
+              <p class="coop-mini" id="coopMechDesc"></p>
+              <label class="coop-label" for="coopLoadout">YOUR WEAPON CONFIGURATION</label
+              ><select class="coop-input" id="coopLoadout">
+                <option value="balanced">BALANCED</option>
+                <option value="cool">COOL RUNNER</option>
+                <option value="heavy">HEAVY GUN</option>
+              </select>
+              <label class="coop-label" for="coopDifficulty"
+                >MISSION DIFFICULTY / HOST SELECTS</label
+              ><select class="coop-input" id="coopDifficulty">
+                <option value="cadet">CADET</option>
+                <option value="regular" selected>REGULAR</option>
+                <option value="veteran">VETERAN</option>
+              </select>
+              <div class="coop-rule">
+                Each pilot has separate armor, ammunition, and repair supplies. Friendly fire is
+                off. Hold <kbd>J</kbd> near a downed teammate to restore their mech.
+              </div>
+            </div>
+            <div>
+              <div id="coopConnect">
+                <label class="coop-label">CREATE A PRIVATE ROOM</label
+                ><button class="button primary coop-wide" id="coopHost">
+                  HOST MISSION <span>↗</span>
+                </button>
+                <div class="coop-or">OR JOIN A FRIEND</div>
+                <label class="coop-label" for="coopCodeInput">ROOM CODE</label>
+                <div class="coop-code-entry">
+                  <input
+                    class="coop-input"
+                    id="coopCodeInput"
+                    maxlength="80"
+                    placeholder="ABCD-EFGH"
+                    autocomplete="off"
+                    spellcheck="false"
+                  /><button class="button" id="coopJoin">JOIN</button>
+                </div>
+              </div>
+              <div id="coopRoom" hidden>
+                <div class="coop-label">ROOM CODE / SHARE WITH YOUR FRIENDS</div>
+                <div class="coop-room-code" id="coopRoomCode">—</div>
+                <div class="actions">
+                  <button class="button small-button" id="coopCopy">COPY CODE</button
+                  ><button class="button small-button" id="coopInvite">COPY INVITE</button>
+                </div>
+                <div class="coop-roster" id="coopRoster" aria-live="polite"></div>
+                <div class="actions">
+                  <button class="button primary" id="coopReady">READY</button
+                  ><button class="button" id="coopLaunch" hidden>DEPLOY LANCE</button>
+                </div>
+                <p class="coop-mini" id="coopLaunchHint">Choose your mech, then select READY.</p>
+              </div>
+              <p id="coopMessage" class="coop-message" role="status" aria-live="polite">
+                Give each friend this HTML file. The host creates a room. Friends enter its code.
+              </p>
+              <details id="coopNetwork">
+                <summary>NETWORK SETTINGS &amp; CONNECTION HELP</summary>
+                <p class="coop-mini">
+                  Online play uses WebRTC and a public PeerServer to connect players. No account,
+                  camera, or microphone is required. Public services can be unavailable. A private
+                  server or TURN relay can be set below. The optional server kit supports WebSocket
+                  relay mode when direct connections fail.
+                </p>
+                <label class="coop-label" for="coopTransport">CONNECTION MODE</label
+                ><select class="coop-input" id="coopTransport">
+                  <option value="rtc">WEBRTC / PUBLIC SIGNAL SERVER</option>
+                  <option value="relay">WEBSOCKET RELAY / PRIVATE SERVER</option></select
+                ><label class="coop-label" for="coopSignal">SIGNAL SERVER / WEBSOCKET URL</label
+                ><input
+                  class="coop-input"
+                  id="coopSignal"
+                  value="wss://0.peerjs.com/peerjs"
+                  spellcheck="false"
+                /><label class="coop-label" for="coopTurn">OPTIONAL TURN SERVER URL</label
+                ><input
+                  class="coop-input"
+                  id="coopTurn"
+                  placeholder="turns:relay.example.com:443?transport=tcp"
+                  spellcheck="false"
+                />
+                <div class="coop-pair">
+                  <input
+                    class="coop-input"
+                    id="coopTurnUser"
+                    placeholder="TURN username"
+                    aria-label="TURN username"
+                    autocomplete="off"
+                  /><input
+                    class="coop-input"
+                    id="coopTurnPass"
+                    type="password"
+                    placeholder="TURN password"
+                    aria-label="TURN password"
+                    autocomplete="off"
+                  />
+                </div>
+                <label class="coop-checkbox"
+                  ><input id="coopForceRelay" type="checkbox" /> Use only relay connections</label
+                >
+                <p class="coop-mini">
+                  Relay credentials stay in this page. They are not put in invites. Use the same
+                  server settings on each computer. A room code is not a password: share it only
+                  with your friends.
+                </p>
+              </details>
+            </div>
+          </div>
+        </div>
+        <footer class="panel-footer">
+          <small id="coopFooter"
+            >All three sectors · All three mechs · Supplied music<br />The host must keep the game
+            open. Solo play still works offline.</small
+          ><button class="button" id="coopLeave">RETURN TO OPERATIONS</button>
+        </footer>
+      </div>
+    </section>
+    <div id="coopNotice" hidden role="status">
+      <b id="coopNoticeTitle"></b><span id="coopNoticeText"></span>
+    </div>
+
+    <div id="toast" hidden></div>
+    <div id="error" role="alert"></div>
+    <noscript
+      ><div id="noscript">
+        <strong>ROBOTWARRIOR</strong
+        ><span>This game needs JavaScript and WebGL. Enable JavaScript to launch.</span>
+      </div></noscript
+    >
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
