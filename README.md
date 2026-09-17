@@ -69,6 +69,16 @@ Hold the aim steady on a target to get missile lock. At 100% heat the reactor sh
 press `G` before that happens. Stop inside a blue repair bay for six seconds to repair and
 rearm, once per bay.
 
+### On a phone
+
+Touch controls appear automatically on a device with a coarse pointer, once a mission
+starts. Hold it sideways. Left stick: throttle up and down, legs left and right — release
+it and your speed holds, because it is a throttle lever rather than a pedal. Drag anywhere
+on the right to swing the torso. Fire, jets, target and coolant sit under your right thumb,
+weapon groups above them.
+
+Render quality is picked for your device and can be overridden in the mission screen.
+
 ### Four-pilot co-op
 
 Up to four pilots over WebRTC data channels. The host runs the authoritative simulation;

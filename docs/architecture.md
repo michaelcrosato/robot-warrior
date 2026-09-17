@@ -53,6 +53,45 @@ Rendering flows downward; nothing in a lower layer reaches up.
 | `src/ui/`       |     2 |   360 | Menu and settings wiring, input handling                     |
 | `src/net/`      |     4 |  2591 | Co-op lobby, lockstep simulation, WebRTC transports          |
 
+## The frame pipeline
+
+The renderer is WebGL 2 and runs five stages per frame:
+
+1. **Shadow cascades.** The view frustum is split by depth; each slice gets an orthographic
+   projection from the sun, rendered depth-only into one layer of a texture array. Fitted to
+   a bounding _sphere_ per slice and snapped to whole texels — both details exist to stop
+   shadow edges crawling during a torso twist, which is most of the time in this game.
+2. **Scene.** Sky, then the world, into an HDR target with a depth texture. Lighting is
+   Cook-Torrance over a hemisphere ambient term, plus up to eight dynamic point lights for
+   weapon fire. Materials are presets chosen per draw — the geometry has no texture
+   coordinates, so there is nothing to sample.
+3. **Ambient occlusion** from that depth buffer, blurred. Desktop tiers only.
+4. **Bloom**: threshold and downsample, then tent-filter back up.
+5. **Composite**: occlusion, bloom, ACES tone map, grade, vignette, grain, FXAA — one pass,
+   one full-resolution read of the scene target.
+
+`renderWorld()` supplies two callbacks, `drawOpaqueWorld` and `drawTransparentWorld`,
+because the scene is traversed once per cascade as well as once for the camera. The opaque
+callback must stay free of anything that is not geometry; the blend helpers it uses are
+no-ops during a cascade for exactly that reason.
+
+**Quality is one axis.** Five tiers — potato, low, mobile, high, ultra — change internal
+resolution, cascade count and which post passes run. Nothing else varies, so tiers differ in
+fidelity rather than content. `mobile` is tuned against a Galaxy S26 and `ultra` against an
+RTX 4070 SUPER; see [ADR 0006](adr/0006-webgl2-render-pipeline.md).
+
+**Debugging.** `?debug=shadow` renders the shadow term alone, `?debug=cascade` colours by
+cascade, and there are normal, albedo and roughness views. They exist because a lighting
+fault renders as a plausible picture — a shadow lookup returning "lit" everywhere is
+indistinguishable from a scene with the sun somewhere else.
+
+## Input
+
+Keyboard and mouse in `src/ui/input.js`, touch in `src/ui/touch.js`. Both write to the same
+state — `G.keys`, `G.mouse`, `G.player.torso` — so the simulation cannot tell which is in
+use and a new control is wired once. Touch controls show only on a coarse primary pointer
+and only during a mission; see [ADR 0007](adr/0007-touch-controls.md).
+
 ## Nothing is loaded — everything is generated
 
 There are no model files, no textures and no level format. `src/core/geometry.js`

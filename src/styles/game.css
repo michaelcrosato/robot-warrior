@@ -1272,3 +1272,313 @@ kbd {
     padding-bottom: 22px;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Touch controls
+   ---------------------------------------------------------------------------
+   Shown only on a coarse pointer, and only while a mission is running — see
+   src/ui/touch.js. Laid out for a phone held sideways in two hands: the left thumb
+   owns the stick, the right thumb the aim area and the action cluster, and nothing
+   important sits where either palm rests.
+
+   `touch-action: none` everywhere inside, because the browser's own pan and
+   double-tap-to-zoom gestures will otherwise fight every drag.
+   --------------------------------------------------------------------------- */
+#touch {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  font-family: Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
+#touch[hidden] {
+  display: none !important;
+}
+
+/* The aim surface sits under every control, so a drag anywhere the buttons do not
+   cover turns the torso. The stacking is stated rather than left to document order:
+   all of these are absolutely positioned siblings, and relying on source order put the
+   aim layer over the buttons and swallowed every press. */
+#touchAim {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  touch-action: none;
+}
+
+#touchStick,
+#touchPad,
+#touchWeapons,
+#touchLeftPad,
+#touchTop {
+  z-index: 2;
+}
+
+/* --- left: the stick ------------------------------------------------------ */
+/* The cockpit draws its instrument row between 78% and 96.4% of the canvas height. Every
+   control is anchored above that band, in percentage terms, so the armour diagram, the
+   radar and the weapon bay stay readable at any aspect ratio instead of being covered by
+   a thumb. `--hud-clear` is that band plus a margin. */
+#touch {
+  --hud-clear: calc(24% + 10px);
+}
+
+#touchStick {
+  position: absolute;
+  left: max(16px, env(safe-area-inset-left, 0px));
+  bottom: var(--hud-clear);
+  width: 140px;
+  height: 140px;
+  touch-action: none;
+}
+
+.stick-ring {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(200, 209, 182, 0.28);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(23, 32, 29, 0.5), rgba(23, 32, 29, 0.78) 70%),
+    repeating-conic-gradient(from 0deg, rgba(200, 209, 182, 0.07) 0deg 2deg, transparent 2deg 45deg);
+  box-shadow: inset 0 0 26px rgba(9, 14, 17, 0.6);
+}
+
+/* Cross-hairs marking the two axes the stick drives. */
+.stick-ring::before,
+.stick-ring::after {
+  content: '';
+  position: absolute;
+  background: rgba(200, 209, 182, 0.16);
+}
+
+.stick-ring::before {
+  left: 12%;
+  right: 12%;
+  top: 50%;
+  height: 1px;
+}
+
+.stick-ring::after {
+  top: 12%;
+  bottom: 12%;
+  left: 50%;
+  width: 1px;
+}
+
+.stick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 58px;
+  height: 58px;
+  margin: -29px 0 0 -29px;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+  background: rgba(245, 139, 81, 0.16);
+  box-shadow: 0 0 18px rgba(245, 139, 81, 0.25);
+  transition: background 0.12s;
+  will-change: transform;
+}
+
+#touchStick.active .stick-knob {
+  background: rgba(245, 139, 81, 0.3);
+}
+
+.stick-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -16px;
+  text-align: center;
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: #8b978b;
+}
+
+.stick-readout {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -17px;
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  color: var(--green);
+}
+
+/* --- buttons -------------------------------------------------------------- */
+.tbtn {
+  border: 1px solid rgba(200, 209, 182, 0.3);
+  background: rgba(23, 32, 29, 0.74);
+  color: var(--ink);
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 1.4px;
+  border-radius: 6px;
+  /* 56px is the smallest target that stays reliable for a thumb in motion. */
+  min-width: 56px;
+  min-height: 56px;
+  display: grid;
+  place-content: center;
+  touch-action: none;
+  backdrop-filter: blur(2px);
+}
+
+.tbtn:active,
+.tbtn.held {
+  background: rgba(245, 139, 81, 0.32);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.tbtn.fire {
+  min-width: 108px;
+  min-height: 108px;
+  border-radius: 50%;
+  font-size: 13px;
+  letter-spacing: 2px;
+  border-color: rgba(245, 139, 81, 0.6);
+  background: rgba(245, 139, 81, 0.16);
+}
+
+.tbtn.small,
+.tbtn.tiny {
+  min-width: 52px;
+  min-height: 40px;
+  font-size: 9px;
+  letter-spacing: 1.2px;
+}
+
+.tbtn.tiny {
+  min-height: 34px;
+  background: rgba(23, 32, 29, 0.6);
+}
+
+.tbtn.weapon {
+  min-width: 46px;
+  min-height: 46px;
+  font-size: 14px;
+}
+
+.tbtn.weapon.selected {
+  border-color: var(--green);
+  color: var(--green);
+  background: rgba(170, 202, 140, 0.16);
+}
+
+/* --- clusters ------------------------------------------------------------- */
+#touchPad {
+  position: absolute;
+  right: max(14px, env(safe-area-inset-right, 0px));
+  bottom: var(--hud-clear);
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-areas:
+    'tgt  fire'
+    'cool fire'
+    'jets fire';
+  gap: 7px;
+  align-items: center;
+}
+
+#touchPad [data-touch='fire'] {
+  grid-area: fire;
+}
+#touchPad [data-touch='jump'] {
+  grid-area: jets;
+}
+#touchPad [data-touch='target'] {
+  grid-area: tgt;
+}
+#touchPad [data-touch='coolant'] {
+  grid-area: cool;
+}
+
+#touchWeapons {
+  position: absolute;
+  right: max(14px, env(safe-area-inset-right, 0px));
+  bottom: calc(var(--hud-clear) + 190px);
+  display: flex;
+  gap: 7px;
+}
+
+#touchLeftPad {
+  position: absolute;
+  left: max(16px, env(safe-area-inset-left, 0px));
+  bottom: calc(var(--hud-clear) + 150px);
+  display: flex;
+  gap: 7px;
+}
+
+#touchTop {
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top, 0px));
+  right: max(18px, env(safe-area-inset-right, 0px));
+  display: flex;
+  gap: 8px;
+}
+
+/* --- portrait ------------------------------------------------------------- */
+/* Playable, but the cockpit is built for a wide frame, so the menu asks for
+   landscape and the controls shrink to stay out of the HUD's way. */
+@media (orientation: portrait) {
+  #touchStick {
+    width: 124px;
+    height: 124px;
+  }
+  .stick-knob {
+    width: 50px;
+    height: 50px;
+    margin: -25px 0 0 -25px;
+  }
+  .tbtn.fire {
+    min-width: 88px;
+    min-height: 88px;
+  }
+  #touchWeapons {
+    bottom: calc(var(--hud-clear) + 168px);
+  }
+  #touchLeftPad {
+    bottom: calc(var(--hud-clear) + 134px);
+  }
+}
+
+/* A short landscape window — a phone held sideways — has no room for stacked rows. */
+@media (orientation: landscape) and (max-height: 430px) {
+  #touchStick {
+    width: 126px;
+    height: 126px;
+  }
+  .stick-knob {
+    width: 50px;
+    height: 50px;
+    margin: -25px 0 0 -25px;
+  }
+  .tbtn.fire {
+    min-width: 92px;
+    min-height: 92px;
+  }
+  .tbtn {
+    min-height: 46px;
+  }
+  #touchWeapons {
+    bottom: calc(var(--hud-clear) + 150px);
+  }
+  #touchLeftPad {
+    bottom: calc(var(--hud-clear) + 128px);
+  }
+  .tbtn.small,
+  .tbtn.tiny {
+    min-width: 46px;
+    min-height: 34px;
+    font-size: 8px;
+  }
+  .tbtn.weapon {
+    min-width: 40px;
+    min-height: 40px;
+  }
+}

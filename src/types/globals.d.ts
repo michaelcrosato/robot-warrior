@@ -70,6 +70,14 @@ export interface GameStatus {
   position: { x: number; y: number; z: number };
   /** km/h. */
   speed: number;
+  /** Torso yaw relative to the legs, radians. */
+  torso: number;
+  /** Torso pitch, radians. */
+  pitch: number;
+  /** Quality tier in force: potato | low | mobile | high | ultra. */
+  tier: string;
+  /** Active render debug view, or 'off'. */
+  debug: string;
   heat: number;
   /** 0..1. */
   armor: number;

@@ -14,3 +14,5 @@ a new record that supersedes it.
 | [0003](0003-keep-the-soundtrack-out-of-the-repo.md)   | Keep the soundtrack out of the repository            | Accepted |
 | [0004](0004-verify-against-a-behavioural-baseline.md) | Verify refactors against a behavioural baseline      | Accepted |
 | [0005](0005-no-runtime-dependencies.md)               | Ship no runtime dependencies                         | Accepted |
+| [0006](0006-webgl2-render-pipeline.md)                | Rebuild the renderer on WebGL 2                      | Accepted |
+| [0007](0007-touch-controls.md)                        | Touch controls feeding the existing input state      | Accepted |

@@ -39,6 +39,44 @@
   <body>
     <canvas id="world" aria-label="RobotWarrior 3D game view"></canvas>
     <canvas id="hud" aria-hidden="true"></canvas>
+    <div id="touch" hidden aria-hidden="true">
+      <div id="touchAim" aria-label="Drag to aim"></div>
+
+      <div id="touchStick">
+        <div class="stick-ring"><div class="stick-knob" id="stickKnob"></div></div>
+        <div class="stick-label">THROTTLE / TURN</div>
+        <div class="stick-readout" id="stickReadout">0%</div>
+      </div>
+
+      <div id="touchLeftPad">
+        <button class="tbtn small" data-touch="stop" aria-label="Stop">STOP</button>
+        <button class="tbtn small" data-touch="align" aria-label="Align legs with torso">
+          ALIGN
+        </button>
+        <button class="tbtn small" data-touch="center" aria-label="Centre torso">CENTRE</button>
+      </div>
+
+      <div id="touchPad">
+        <button class="tbtn hold" data-touch="jump" aria-label="Jump jets">JETS</button>
+        <button class="tbtn fire" data-touch="fire" aria-label="Fire">FIRE</button>
+        <button class="tbtn" data-touch="target" aria-label="Next target">TGT</button>
+        <button class="tbtn" data-touch="coolant" aria-label="Coolant flush">COOL</button>
+      </div>
+
+      <div id="touchWeapons" role="group" aria-label="Weapon select">
+        <button class="tbtn weapon" data-touch="weapon" data-index="0">1</button>
+        <button class="tbtn weapon" data-touch="weapon" data-index="1">2</button>
+        <button class="tbtn weapon" data-touch="weapon" data-index="2">3</button>
+      </div>
+
+      <div id="touchTop">
+        <button class="tbtn tiny" data-touch="pause" aria-label="Pause">❚❚</button>
+        <button class="tbtn tiny" data-touch="imaging" aria-label="Enhanced Imaging">EI</button>
+        <button class="tbtn tiny" data-touch="zoom" aria-label="Zoom">ZOOM</button>
+        <button class="tbtn tiny" data-touch="map" aria-label="Tactical map">MAP</button>
+        <button class="tbtn tiny" data-touch="nav" aria-label="Next waypoint">NAV</button>
+      </div>
+    </div>
     <div id="vignette"></div>
     <div id="grain"></div>
     <div id="loading"><strong>ROBOTWARRIOR</strong><span>INITIALIZING COMBAT SYSTEMS</span></div>
@@ -83,8 +121,10 @@
           ><button class="button" id="coopOpen">ONLINE CO-OP <span> / 1—4</span></button>
         </div>
         <button class="text-button" id="manualBtn">[ H ] &nbsp; FIELD MANUAL</button>
-        <div class="menu-hint">KEYBOARD + MOUSE &nbsp; / &nbsp; HEADPHONES RECOMMENDED</div>
-        <div id="touchWarn">This game needs a keyboard and mouse.</div>
+        <div class="menu-hint" id="inputHint">
+          KEYBOARD + MOUSE &nbsp; / &nbsp; HEADPHONES RECOMMENDED
+        </div>
+        <div id="touchWarn">Turn your device sideways for the full cockpit.</div>
       </main>
       <div class="hero-tag">
         <strong id="heroCode">WRD—70</strong><span id="heroClass">WARDEN / HEAVY CLASS</span>
@@ -304,6 +344,16 @@
             <div class="control">
               Sound / full screen <span><kbd>P</kbd> / <kbd>ALT + ENTER</kbd></span>
             </div>
+          </div>
+          <div class="help-note">
+            <p>
+              <b>On a phone or tablet:</b> Touch controls appear once a mission starts. Hold the
+              device sideways. The left stick sets throttle and turns the legs; release it and your
+              speed holds, because it is a throttle lever rather than a pedal. Drag anywhere on the
+              right to swing the torso. FIRE, JETS, TGT and COOL sit under your right thumb, the
+              weapon groups above them, STOP, ALIGN and CENTRE under your left. Render detail is
+              chosen for your device and can be changed in the mission screen.
+            </p>
           </div>
           <div class="help-note">
             <p>

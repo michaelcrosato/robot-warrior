@@ -2,6 +2,8 @@
  * Entry point. Builds the pilot, generates the mission, wires the interface and starts the frame loop, then freezes a read-only status API onto `window` for tests and performance checks.
  */
 import { $ } from './core/dom.js';
+import { activeTier } from './core/quality.js';
+import { debugModeName } from './render/debug.js';
 import { G } from './sim/state.js';
 import { applyChassisWeapons, newPlayer, playerArmor } from './sim/player.js';
 import {
@@ -17,6 +19,7 @@ import { fps, frame } from './loop.js';
 import { initCoop } from './net/coop-bridge.js';
 import { initInput } from './ui/input.js';
 import { initMenu, updateChassisUI } from './ui/menu.js';
+import { initTouch } from './ui/touch.js';
 import { pools } from './entities/pools.js';
 import { sound } from './audio/sound-system.js';
 
@@ -37,6 +40,8 @@ populate();
 initMenu();
 
 initInput();
+
+initTouch();
 
 initCoop();
 
@@ -77,6 +82,10 @@ Object.defineProperty(window, 'RobotWarrior', {
       time: G.missionTime,
       position: { x: G.player.x, y: G.player.y + G.player.altitude, z: G.player.z },
       speed: G.player.speed * 3.6,
+      torso: G.player.torso,
+      pitch: G.player.pitch,
+      tier: activeTier().id,
+      debug: debugModeName,
       heat: G.player.heat,
       armor: playerArmor(),
       ammo: G.player.ammo,

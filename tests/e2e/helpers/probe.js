@@ -11,13 +11,23 @@
 const VOLATILE = new Set(['fps', 'time', 'transportTime', 'serviceProgress', 'supplyProgress']);
 
 /**
+ * Fields the status API gained after the baseline was captured.
+ *
+ * The baseline is a recording of the original single-file build, so it cannot contain
+ * them and an exact comparison would fail on their presence alone. They are excluded by
+ * name rather than by loosening the comparison, so the list stays short and visible —
+ * every entry is a deliberate decision that the baseline no longer covers that field.
+ */
+const ADDED_SINCE_BASELINE = new Set(['torso', 'pitch', 'tier', 'debug']);
+
+/**
  * Strip values that vary with wall-clock time so a diff only shows real drift.
  * @param {import('../../../src/types/globals').GameStatus} status
  */
 export function stable(status) {
   const out = {};
   for (const [k, v] of Object.entries(status)) {
-    if (VOLATILE.has(k)) continue;
+    if (VOLATILE.has(k) || ADDED_SINCE_BASELINE.has(k)) continue;
     out[k] = v;
   }
   // The audio block reports decode + playback progress, which is timing dependent.
