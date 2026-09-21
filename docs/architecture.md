@@ -85,6 +85,16 @@ cascade, and there are normal, albedo and roughness views. They exist because a 
 fault renders as a plausible picture — a shadow lookup returning "lit" everywhere is
 indistinguishable from a scene with the sun somewhere else.
 
+`window.RobotWarrior.scanTargets()` reads every render target back and reports non-finite
+values per stage. It is far too slow for a frame and exists for one reason: **a single bad
+pixel in the HDR target is not a single bad pixel on screen.** The bloom prefilter reads a
+13-tap neighbourhood and each downsample level widens it again, so fifteen NaN pixels have
+been measured becoming three hundred thousand by the first mip and a black rectangle across
+the middle of the screen after the composite — roughly twenty thousand to one. Anything
+writing into the scene target has to be finite, and when it is not, the picture tells you
+nothing about where it came from. The prefilter now rejects non-finite input as a
+containment layer, and `tests/e2e/render.spec.js` checks every stage during combat.
+
 ## Input
 
 Keyboard and mouse in `src/ui/input.js`, touch in `src/ui/touch.js`. Both write to the same

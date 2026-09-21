@@ -28,9 +28,18 @@ out vec3 vColor;
 void main() {
   vec4 world = uModel * vec4(aPos, 1.0);
   vWorld = world.xyz;
+
   // The full normal matrix, not mat3(uModel): parts are scaled non-uniformly all over
   // this model set, and using the model matrix directly skews every normal on them.
-  vNormal = normalize(uNormalMatrix * aNormal);
+  //
+  // The guard is not decoration: normalize() of a zero-length vector is undefined in GLSL
+  // and yields NaN, a NaN written into the HDR target is spread by the bloom chain into a
+  // black rectangle covering much of the screen, and geometry.js used to produce exactly
+  // such a normal for every sphere's pole band. That generator is fixed; this makes the
+  // whole class of fault impossible to reach from here.
+  vec3 rawNormal = uNormalMatrix * aNormal;
+  float normalLength = length(rawNormal);
+  vNormal = normalLength > 1e-8 ? rawNormal / normalLength : vec3(0.0, 1.0, 0.0);
   vColor = aColor;
   gl_Position = uVP * world;
 }

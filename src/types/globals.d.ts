@@ -104,6 +104,24 @@ declare global {
       readonly version: string;
       getStatus(): GameStatus;
       getCoopStatus(): Record<string, unknown>;
+      /**
+       * Non-finite-value scan of every render target, for diagnostics and tests.
+       *
+       * Reads each target back in full, so it is far too slow for a frame — it exists
+       * because a NaN in the HDR buffer is invisible until the bloom chain has already
+       * turned it into a black rectangle, and by then the picture says nothing about
+       * where it came from.
+       */
+      scanTargets(): {
+        name: string;
+        size: string;
+        nan?: number;
+        inf?: number;
+        negative?: number;
+        max?: number;
+        firstNaN?: number[] | null;
+        error?: string;
+      }[];
     };
   }
 }

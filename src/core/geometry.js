@@ -1,10 +1,45 @@
 /**
  * Procedural geometry: every mesh in the game is generated here rather than loaded.
  */
-import { TAU, cross, dot, norm, vadd, vmul, vsub } from './math.js';
+import { TAU, dot, vadd, vmul } from './math.js';
+
+/**
+ * The normal of a polygon, by Newell's method.
+ *
+ * Summing the cross products around the whole boundary rather than taking one from the
+ * first three vertices. The difference matters wherever a polygon opens with two
+ * coincident or collinear points — a sphere's pole quads do exactly that, and the
+ * three-point version returned a zero vector for every one of them.
+ *
+ * A zero normal is not a cosmetic problem. The scene vertex shader calls
+ * `normalize(uNormalMatrix * aNormal)`, `normalize` of a zero-length vector is undefined
+ * in GLSL and yields NaN in practice, and one NaN in the HDR target is enough to put a
+ * screen-filling black rectangle on the picture once the bloom chain has spread it.
+ *
+ * @param {number[][]} points
+ * @returns {number[]} unnormalised; length is twice the polygon's area
+ */
+function newellNormal(points) {
+  let nx = 0,
+    ny = 0,
+    nz = 0;
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i],
+      b = points[(i + 1) % points.length];
+    nx += (a[1] - b[1]) * (a[2] + b[2]);
+    ny += (a[2] - b[2]) * (a[0] + b[0]);
+    nz += (a[0] - b[0]) * (a[1] + b[1]);
+  }
+  return [nx, ny, nz];
+}
 
 export function polygon(out, points, color = [1, 1, 1], outward = false) {
-  let n = norm(cross(vsub(points[1], points[0]), vsub(points[2], points[0])));
+  const raw = newellNormal(points);
+  const length = Math.hypot(...raw);
+  // A polygon with no area at all has no normal to compute. That should not happen in
+  // this model set, but emitting zeros would hand NaN to the shader, so a valid unit
+  // vector is the safe answer: the triangles are zero-area and rasterise to nothing.
+  let n = length > 1e-9 ? raw.map((v) => v / length) : [0, 1, 0];
   if (
     outward &&
     dot(

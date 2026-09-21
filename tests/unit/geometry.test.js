@@ -71,6 +71,41 @@ function expectWellFormed(out, label) {
   return { vertices: vs, triangles: vs.length / 3, degenerate, unlit };
 }
 
+describe('normals are always usable', () => {
+  // The scene vertex shader does `normalize(uNormalMatrix * aNormal)`. `normalize` of a
+  // zero-length vector is undefined in GLSL and produces NaN in practice, and a NaN in
+  // the HDR target is not a local defect: the bloom prefilter reads a 13-tap neighbourhood
+  // and each of six downsample levels widens the poisoned region, so a handful of pixels
+  // becomes a screen-filling black rectangle. Every generator must therefore emit a
+  // normal that can be normalised — for every triangle, including degenerate ones.
+  const generators = {
+    boxGeom: () => boxGeom(),
+    'boxGeom(bevelled)': () => boxGeom(0.19),
+    cylinderGeom: () => cylinderGeom(),
+    'cylinderGeom(tapered)': () => cylinderGeom(7, 0.35),
+    sphereGeom: () => sphereGeom(),
+    dishGeom: () => dishGeom(),
+    ringGeom: () => ringGeom(),
+    rockGeom: () => rockGeom(3),
+  };
+
+  for (const [name, make] of Object.entries(generators)) {
+    it(`${name} emits no zero-length normal`, () => {
+      const vs = vertices(make());
+      const bad = vs.filter((v) => Math.hypot(...v.normal) < 1e-6);
+      expect(bad.length, `${bad.length} of ${vs.length} vertices carry a zero normal`).toBe(0);
+    });
+  }
+
+  it('every generator emits finite normals', () => {
+    for (const [name, make] of Object.entries(generators)) {
+      for (const v of vertices(make())) {
+        expect(v.normal.every(Number.isFinite), `${name} produced a non-finite normal`).toBe(true);
+      }
+    }
+  });
+});
+
 describe('polygon', () => {
   it('fans a quad into two triangles', () => {
     const out = [];
@@ -160,15 +195,22 @@ describe('primitive generators', () => {
     for (const v of vs) expect(Math.hypot(...v.position)).toBeCloseTo(1, 6);
   });
 
-  it('leaves the band at a sphere’s top pole unlit', () => {
-    // A latitude/longitude sphere pinches to a point, so the top band's quads open
-    // with two coincident vertices and polygon() cannot derive a normal for them.
-    // The band is therefore drawn flat-shaded black. Spheres are only used for small
-    // details — cockpit bulbs, impact motes — so this has never been worth fixing;
-    // the test records it so a future change to polygon() is a deliberate one.
+  it('lights the band at a sphere’s top pole', () => {
+    // A latitude/longitude sphere pinches to a point, so the top band's quads open with
+    // two coincident vertices. This used to leave them with a zero normal, and an earlier
+    // version of this test asserted that as acceptable on the grounds that spheres are
+    // only used for small details.
+    //
+    // It was not acceptable. The scene vertex shader normalises that normal, `normalize`
+    // of a zero vector is NaN, and NaN in the HDR target is not a local defect — the bloom
+    // prefilter reads a 13-tap neighbourhood and six downsample levels widen it, so fifteen
+    // poisoned pixels became a black rectangle across the middle of the screen whenever a
+    // projectile or a puff of smoke was on screen. polygon() now derives normals by
+    // Newell's method, which is well defined for these quads.
     const segments = 14;
     const sphere = expectWellFormed(sphereGeom(8, segments), 'sphereGeom');
-    expect(sphere.unlit).toBe(2 * segments);
+    expect(sphere.unlit, 'no triangle may carry a zero normal').toBe(0);
+    // The pinched quads are still zero-area — they simply rasterise to nothing now.
     expect(sphere.degenerate).toBe(2 * segments);
   });
 

@@ -42,6 +42,23 @@ uniform float uSoftKnee;
 uniform float uFirstPass;
 out vec4 fragColor;
 
+/**
+ * Reject values that must not enter the chain.
+ *
+ * This is the point where one bad pixel becomes a visible defect: the 13-tap below reads a
+ * neighbourhood, and each of the levels above widens it again, so a single NaN in the
+ * scene target has been measured turning into three hundred thousand of them by the first
+ * downsample and a black rectangle across the middle of the screen after the composite.
+ *
+ * NaN fails every comparison with itself, which is the only reliable way to detect it
+ * here — clamping does not remove it. Infinities are clipped to a large finite value
+ * rather than zeroed, because a genuinely enormous highlight should still bloom.
+ */
+vec3 sanitize(vec3 c) {
+  vec3 finite = min(c, vec3(65000.0));
+  return mix(vec3(0.0), finite, vec3(c.r == c.r, c.g == c.g, c.b == c.b));
+}
+
 vec3 prefilter(vec3 c) {
   float brightness = max(c.r, max(c.g, c.b));
   float knee = uThreshold * uSoftKnee + EPS;
@@ -51,7 +68,7 @@ vec3 prefilter(vec3 c) {
   return c * contribution;
 }
 
-vec3 tap(vec2 uv) { return texture(uSource, uv).rgb; }
+vec3 tap(vec2 uv) { return sanitize(texture(uSource, uv).rgb); }
 
 void main() {
   vec2 t = uTexel;

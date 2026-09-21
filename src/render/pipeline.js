@@ -317,6 +317,64 @@ function renderBloom(tier) {
 }
 
 /**
+ * Scan every intermediate target for values that are not finite.
+ *
+ * Instrumentation at each stage boundary. A NaN or an Inf in the HDR target is invisible
+ * on its own, but the bloom chain downsamples it into a growing block and the composite
+ * turns that block black — so knowing *which* stage first holds one is the whole question.
+ *
+ * Reads back a downsampled grid rather than every pixel; a NaN that matters is never a
+ * single isolated texel by the time it reaches the chain.
+ */
+export function scanTargets() {
+  const report = [];
+
+  const scan = (name, target) => {
+    if (!target) return;
+    // The whole target, not a corner. An earlier version of this read only the first
+    // 128x128 and reported a "scene max" that was lower than the bloom built from it,
+    // which is impossible — and which is exactly the kind of wrong answer that sends an
+    // investigation after the wrong component.
+    const w = target.w;
+    const h = target.h;
+    const px = new Float32Array(w * h * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target.fb);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.FLOAT, px);
+    if (gl.getError() !== gl.NO_ERROR) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      report.push({ name, size: `${w}x${h}`, error: 'readPixels failed' });
+      return;
+    }
+    let nan = 0;
+    let inf = 0;
+    let negative = 0;
+    let max = 0;
+    let firstNaN = null;
+    for (let i = 0; i < px.length; i++) {
+      if (i % 4 === 3) continue;
+      const v = px[i];
+      if (Number.isNaN(v)) {
+        nan++;
+        if (!firstNaN) {
+          const pixel = Math.floor(i / 4);
+          firstNaN = [pixel % w, Math.floor(pixel / w)];
+        }
+      } else if (!Number.isFinite(v)) inf++;
+      else {
+        if (v < 0) negative++;
+        if (v > max) max = v;
+      }
+    }
+    report.push({ name, size: `${w}x${h}`, nan, inf, negative, max: +max.toFixed(2), firstNaN });
+  };
+
+  scan('scene', current.scene);
+  current.bloomChain.forEach((t, i) => scan(`bloom[${i}]`, t));
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  return report;
+}
+
+/**
  * Render one frame.
  *
  * @param {import('../core/quality.js').Tier} tier
