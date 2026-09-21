@@ -19,6 +19,18 @@
 import { test, expect } from '@playwright/test';
 import { waitForBoot, MISSION_START_TIMEOUT } from './helpers/probe.js';
 
+/**
+ * A small viewport, deliberately.
+ *
+ * These tests are about shader correctness, not resolution — a NaN reaches the bloom chain
+ * at any size. Every pass still runs, including shadow cascades at their full map size,
+ * but at a quarter of the fragments. That matters because the suite renders through
+ * SwiftShader on a shared runner, and the boot sequence advances on a per-frame delta that
+ * the loop clamps to 0.2 s: below about five frames a second, startup stretches in real
+ * time until it outruns any reasonable timeout. It did.
+ */
+test.use({ viewport: { width: 640, height: 400 } });
+
 /** Force a tier with shadows, bloom and ambient occlusion, whatever the hardware reports. */
 async function useTier(page, quality) {
   await page.addInitScript(
@@ -74,23 +86,37 @@ async function darkBlockFraction(page) {
 test.describe('render pipeline integrity', () => {
   test('no stage holds a non-finite value during sustained fire', async ({ page }) => {
     await useTier(page, 'high');
-    await fightFor(page, 2500);
+    await fightFor(page, 600);
 
-    const stages = await page.evaluate(() => window.RobotWarrior.scanTargets());
-    expect(
-      stages.length,
-      'the scan must cover the scene target and the bloom chain',
-    ).toBeGreaterThan(1);
-
-    for (const stage of stages) {
-      expect(stage.error, `${stage.name} could not be read back`).toBeUndefined();
-      expect(stage.nan, `${stage.name} holds ${stage.nan} NaN (first at ${stage.firstNaN})`).toBe(
-        0,
-      );
-      expect(stage.inf, `${stage.name} holds ${stage.inf} infinities`).toBe(0);
+    // Sampled repeatedly rather than once at the end. The fault this guards against was
+    // transient — it needed a sphere's pole band actually rasterised, which depends on
+    // which projectiles and smoke happen to be on screen at that instant. A single scan
+    // caught it at one tier and missed it at another, which is no guard at all.
+    const worst = new Map();
+    for (let i = 0; i < 8; i++) {
+      const stages = await page.evaluate(() => window.RobotWarrior.scanTargets());
+      expect(
+        stages.length,
+        'the scan must cover the scene target and the bloom chain',
+      ).toBeGreaterThan(1);
+      for (const stage of stages) {
+        const seen = worst.get(stage.name) ?? { nan: 0, inf: 0, firstNaN: null };
+        worst.set(stage.name, {
+          nan: Math.max(seen.nan, stage.nan ?? 0),
+          inf: Math.max(seen.inf, stage.inf ?? 0),
+          firstNaN: seen.firstNaN ?? stage.firstNaN ?? null,
+          error: stage.error ?? seen.error,
+        });
+      }
+      await page.waitForTimeout(350);
     }
-
     await page.mouse.up();
+
+    for (const [name, stage] of worst) {
+      expect(stage.error, `${name} could not be read back`).toBeUndefined();
+      expect(stage.nan, `${name} held ${stage.nan} NaN (first at ${stage.firstNaN})`).toBe(0);
+      expect(stage.inf, `${name} held ${stage.inf} infinities`).toBe(0);
+    }
   });
 
   test('combat does not fill the screen with black blocks', async ({ page }) => {
@@ -127,9 +153,13 @@ test.describe('render pipeline integrity', () => {
   });
 
   test('every tier with a post chain renders cleanly', async ({ page }) => {
+    // Four missions, each on a heavier tier than the last, all in software. The default
+    // per-test budget does not cover that.
+    test.setTimeout(240_000);
+
     // The bloom chain differs by tier — its depth, and whether ambient occlusion runs at
     // all. A fault that only appears at one mip count would otherwise go unseen.
-    for (const tier of ['low', 'mobile', 'ultra']) {
+    for (const tier of ['low', 'mobile', 'high', 'ultra']) {
       await page.addInitScript(
         (q) =>
           localStorage.setItem(
