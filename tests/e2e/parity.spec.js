@@ -15,6 +15,7 @@ import {
   measureFrames,
   STATIC_TYPES,
   WALK_TOLERANCE,
+  MISSION_START_TIMEOUT,
 } from './helpers/probe.js';
 
 const baseline = JSON.parse(
@@ -131,7 +132,9 @@ test.describe('unpacked build matches the original', () => {
     await page.goto('/');
     await waitForBoot(page);
     await page.click('#startBtn');
-    await page.waitForFunction(() => window.RobotWarrior.getStatus().state === 'playing');
+    await page.waitForFunction(() => window.RobotWarrior.getStatus().state === 'playing', null, {
+      timeout: MISSION_START_TIMEOUT,
+    });
 
     const { before, after, advanced } = await measureFrames(page, 2500);
     console.log(`loop: ${before.fps} -> ${after.fps} fps, ${advanced.toFixed(2)}s of mission time`);
@@ -167,7 +170,9 @@ test.describe('unpacked build matches the original', () => {
     await page.goto('/');
     await waitForBoot(page);
     await page.click('#startBtn');
-    await page.waitForFunction(() => window.RobotWarrior.getStatus().state === 'playing');
+    await page.waitForFunction(() => window.RobotWarrior.getStatus().state === 'playing', null, {
+      timeout: MISSION_START_TIMEOUT,
+    });
     // Give the fetches time to resolve or 404.
     await page.waitForTimeout(6000);
 
@@ -230,7 +235,9 @@ test.describe('unpacked build matches the original', () => {
     await page.goto('/');
     await waitForBoot(page);
     await page.click('#startBtn');
-    await page.waitForFunction(() => window.RobotWarrior.getStatus().state === 'playing');
+    await page.waitForFunction(() => window.RobotWarrior.getStatus().state === 'playing', null, {
+      timeout: MISSION_START_TIMEOUT,
+    });
     await page.waitForTimeout(2500);
 
     const glError = await page.evaluate(() => {

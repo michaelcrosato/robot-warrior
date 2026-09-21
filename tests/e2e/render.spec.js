@@ -17,7 +17,7 @@
  * these force a desktop tier.
  */
 import { test, expect } from '@playwright/test';
-import { waitForBoot } from './helpers/probe.js';
+import { waitForBoot, MISSION_START_TIMEOUT } from './helpers/probe.js';
 
 /** Force a tier with shadows, bloom and ambient occlusion, whatever the hardware reports. */
 async function useTier(page, quality) {
@@ -33,7 +33,7 @@ async function fightFor(page, ms) {
   await waitForBoot(page);
   await page.click('#startBtn');
   await page.waitForFunction(() => window.RobotWarrior.getStatus().state === 'playing', null, {
-    timeout: 60_000,
+    timeout: MISSION_START_TIMEOUT,
   });
   await page.waitForTimeout(1000);
 
@@ -100,7 +100,7 @@ test.describe('render pipeline integrity', () => {
     await waitForBoot(page);
     await page.click('#startBtn');
     await page.waitForFunction(() => window.RobotWarrior.getStatus().state === 'playing', null, {
-      timeout: 60_000,
+      timeout: MISSION_START_TIMEOUT,
     });
     await page.waitForTimeout(1200);
 

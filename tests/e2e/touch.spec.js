@@ -7,7 +7,7 @@
  * fire button spends ammunition, the weapon pad changes the selected group.
  */
 import { test, expect } from '@playwright/test';
-import { waitForBoot } from './helpers/probe.js';
+import { waitForBoot, MISSION_START_TIMEOUT } from './helpers/probe.js';
 
 /** Galaxy S26, landscape. 894x412 CSS pixels at a 3x device pixel ratio. */
 const PHONE = {
@@ -65,7 +65,7 @@ async function startMission(page) {
   await waitForBoot(page);
   await page.click('#startBtn');
   await page.waitForFunction(() => window.RobotWarrior.getStatus().state === 'playing', null, {
-    timeout: 60_000,
+    timeout: MISSION_START_TIMEOUT,
   });
 }
 
@@ -122,7 +122,7 @@ test.describe('touch controls', () => {
         return Math.hypot(p.x - from.x, p.z - from.z) > 3;
       },
       before,
-      { timeout: 30_000 },
+      { timeout: MISSION_START_TIMEOUT },
     );
 
     const status = await page.evaluate(() => window.RobotWarrior.getStatus());
@@ -206,7 +206,7 @@ test.describe('touch controls', () => {
     const fire = await centre(page, '[data-touch="fire"]');
     await pointer(page, '[data-touch="fire"]', 'pointerdown', fire.x, fire.y, 10);
     await page.waitForFunction((from) => window.RobotWarrior.getStatus().ammo < from, before, {
-      timeout: 30_000,
+      timeout: MISSION_START_TIMEOUT,
     });
     await pointer(page, '[data-touch="fire"]', 'pointerup', fire.x, fire.y, 10);
 

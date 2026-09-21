@@ -76,6 +76,35 @@ export async function probeBoot(page) {
 }
 
 /**
+ * How long to allow for a mission to become playable.
+ *
+ * The startup sequence is paced by the boot audio cue, and with no soundtrack present — a
+ * fresh clone, so also CI — it falls back to a wall-clock timer of roughly 8.5 seconds.
+ * That is real time before the mission starts, on top of whatever a shared runner needs to
+ * render the first frames of a shadowed scene through SwiftShader.
+ *
+ * One constant, used by every spec. Three separate numbers drifted apart once already and
+ * CI failed on the one that had not been raised.
+ */
+export const MISSION_START_TIMEOUT = 60_000;
+
+/**
+ * Open the game, deploy, and wait until the mission is actually playable.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {{settle?: number}} [options] extra milliseconds to let frames run afterwards
+ */
+export async function startMission(page, options = {}) {
+  await page.goto('/');
+  await waitForBoot(page);
+  await page.click('#startBtn');
+  await page.waitForFunction(() => window.RobotWarrior.getStatus().state === 'playing', null, {
+    timeout: MISSION_START_TIMEOUT,
+  });
+  if (options.settle) await page.waitForTimeout(options.settle);
+}
+
+/**
  * Entity types that never move once placed.
  *
  * Their coordinates are derived at spawn from the site table in `src/world/sites.js` and
@@ -101,10 +130,10 @@ export const WALK_TOLERANCE = 120;
 export async function probeMission(page) {
   await waitForBoot(page);
   await page.click('#startBtn');
-  // Let a few frames run so the loop, HUD and sim have all executed at least once.
   await page.waitForFunction(() => window.RobotWarrior.getStatus().state === 'playing', null, {
-    timeout: 30_000,
+    timeout: MISSION_START_TIMEOUT,
   });
+  // Let a few frames run so the loop, HUD and sim have all executed at least once.
   await page.waitForTimeout(1500);
 
   const raw = await page.evaluate(() => window.RobotWarrior.getStatus());
