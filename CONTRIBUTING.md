@@ -10,20 +10,10 @@ supersedes anything here that conflicts.
 
 ## Getting set up
 
-```bash
-git clone https://github.com/michaelcrosato/robot-warrior.git
-cd robot-warrior
-pnpm install
-pnpm exec playwright install chromium    # once; the e2e suite drives a real browser
-pnpm dev                                 # http://127.0.0.1:5180
-```
-
-Node 22 or newer.
-
-**There will be no mission music, and that is correct.** The three soundtrack tracks are
-copyrighted commercial recordings and are not distributed with this source. Everything
-else — weapons, warnings, radio speech — works. See [docs/assets.md](docs/assets.md) if
-you want to supply your own.
+[AGENTS.md](AGENTS.md) is the shared guide to setup, scripts, code conventions, tests and
+commits. [docs/deployment.md](docs/deployment.md#local-builds-and-browser-checks) covers
+running and inspecting the game; [docs/assets.md](docs/assets.md) explains the optional
+local soundtrack.
 
 ## Before you open a pull request
 
@@ -31,9 +21,8 @@ you want to supply your own.
 pnpm verify
 ```
 
-That runs, in the same order CI does: asset check, formatting, lint, typecheck, unit
-tests, production build, end-to-end suite. It takes about a minute. Please read its
-output rather than assuming it passed — and paste the relevant part into the PR.
+Read its output and paste the relevant part into the PR. Keep the recorded behavioural
+baseline unchanged; a failing parity check needs an explanation or a code fix.
 
 ## Understanding the code first
 
@@ -43,44 +32,6 @@ Two documents, and they will save you time:
   works, and a frank list of the rough edges.
 - **[docs/adr/](docs/adr/README.md)** — why things are as they are. If a design choice
   looks wrong, check whether there is a record explaining what it cost to get there.
-
-## Three things that will trip you up
-
-Each of these has already caused a real failure here, so they are worth stating plainly.
-
-**Shared mutable state lives on exported objects** — `G`, `camera`, `pass`, `pools`,
-`structures`. ES modules forbid assigning to an imported binding, and this state has
-writers in several modules, so plain exported `let`s will not compile.
-[ADR 0002](docs/adr/0002-shared-state-as-namespace-objects.md) has the reasoning.
-
-**Never shadow one of those names with a local.** It shadows the import silently. A
-namespace object named `view` once captured a local of the same name and crashed the
-first rendered frame.
-
-**Never regenerate `tests/e2e/__baseline__/original.json` to make a test pass.** It is a
-recording of how the original single-file build behaved, and it is the only evidence
-that the refactor preserved anything. If parity fails, treat the change as wrong until
-you have shown otherwise.
-
-## Tests
-
-Put logic in a pure function and unit test it where you reasonably can —
-`tests/unit/` runs in Node and is fast. Anything that owns WebGL, canvas, audio or
-socket state belongs in `tests/e2e/`, which drives the real built game through the
-`window.RobotWarrior` status API.
-
-If a test encodes behaviour that is imperfect rather than intended, say so in a comment.
-There are two examples in `tests/unit/geometry.test.js`.
-
-## Commits
-
-[Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`,
-`refactor:`, `test:`, `docs:`, `chore:`, `perf:`, `build:`, `ci:`, with `!` for a
-breaking change.
-
-Write the body for someone reading it in a year with no context: what changed, why this
-approach, what it cost, what you verified. If something surprised you, put it in the
-message — it is the cheapest place to leave it, and it is usually the most valuable part.
 
 ## Reporting bugs
 

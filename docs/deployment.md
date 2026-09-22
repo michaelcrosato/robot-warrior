@@ -96,9 +96,48 @@ If you want music on your own deployment, put the files in `assets/audio/music/`
 building. They are gitignored, so that means building from a working copy that has them
 rather than from a fresh clone.
 
+## Local builds and browser checks
+
+```bash
+pnpm dev                     # http://127.0.0.1:5180, source with hot reload
+pnpm build
+pnpm preview                 # http://127.0.0.1:4180, production output
+```
+
+Both servers bind to IPv4 loopback and use strict ports. A port conflict fails instead
+of selecting another port; check the process serving the page before trusting a result.
+
+The game needs real WebGL 2 and WebAudio. `pnpm test:e2e` builds and checks it in Chromium.
+For an interactive check, wait until `window.RobotWarrior` exists **and** `#loading` is
+hidden, then inspect:
+
+```js
+window.RobotWarrior.getStatus(); // mission, pilot telemetry, audio and entity roster
+window.RobotWarrior.getCoopStatus();
+window.RobotWarrior.scanTargets(); // expensive render-target diagnostic, not a frame hook
+```
+
+The API is read-only; its types live in `src/types/globals.d.ts`. Start a mission with
+`#startBtn` and use the [controls in the README](../README.md#controls) or the in-game
+field manual. Screenshots complement the status output when checking rendering and layout.
+
+For custom browser probes, reuse `tests/e2e/helpers/probe.js` and the Chromium launch
+options in `playwright.config.js`. The SwiftShader flags provide headless WebGL;
+`--autoplay-policy=no-user-gesture-required` lets audio start and `--mute-audio` keeps it
+quiet. Listen for page exceptions and console errors so a boot failure does not appear
+only as a timeout. Missing optional music can produce network 404s, as described above.
+
+If boot fails:
+
+- Reproduce against `pnpm dev` for readable source names in errors.
+- A `Cannot access 'X' before initialization` error usually points to a module cycle or
+  shadowed shared-state name; see [AGENTS.md](../AGENTS.md).
+- If `#error` reports WebGL unavailable, check hardware acceleration or the headless
+  launch flags.
+
 ## The offline build is not deployed anywhere
 
-`pnpm run build:single` produces `dist-single/RobotWarrior.html`, a self-contained ~12 MB
+`pnpm run build:single` produces `dist-single/RobotWarrior.html`, a self-contained
 file that runs from `file://` with every clip inlined as a data URL. It is built in CI to
 prove it still works, but it is never published — on a machine that has the soundtrack, it
 would embed those recordings.
