@@ -1273,312 +1273,413 @@ kbd {
   }
 }
 
-/* ---------------------------------------------------------------------------
-   Touch controls
-   ---------------------------------------------------------------------------
-   Shown only on a coarse pointer, and only while a mission is running — see
-   src/ui/touch.js. Laid out for a phone held sideways in two hands: the left thumb
-   owns the stick, the right thumb the aim area and the action cluster, and nothing
-   important sits where either palm rests.
-
-   `touch-action: none` everywhere inside, because the browser's own pan and
-   double-tap-to-zoom gestures will otherwise fight every drag.
-   --------------------------------------------------------------------------- */
+/* Mobile cockpit: readable telemetry above, two thumb controls at the bottom. */
 #touch {
-  position: absolute;
+  --touch-left: max(12px, env(safe-area-inset-left, 0px));
+  --touch-right: max(12px, env(safe-area-inset-right, 0px));
+  --touch-top: max(10px, env(safe-area-inset-top, 0px));
+  --touch-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  position: fixed;
   inset: 0;
   z-index: 6;
   touch-action: none;
-  -webkit-user-select: none;
   user-select: none;
+  -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
-  font-family: Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font:
+    12px Consolas,
+    'Liberation Mono',
+    monospace;
+  text-shadow: 0 1px 3px #000;
 }
-
+#touch [hidden],
 #touch[hidden] {
   display: none !important;
 }
-
-/* The aim surface sits under every control, so a drag anywhere the buttons do not
-   cover turns the torso. The stacking is stated rather than left to document order:
-   all of these are absolutely positioned siblings, and relying on source order put the
-   aim layer over the buttons and swallowed every press. */
 #touchAim {
   position: absolute;
   inset: 0;
-  z-index: 0;
   touch-action: none;
 }
-
+#touchControls {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
 #touchStick,
 #touchPad,
-#touchWeapons,
-#touchLeftPad,
+#touchWeapons {
+  pointer-events: auto;
+}
+#touchHeader {
+  position: absolute;
+  top: var(--touch-top);
+  left: var(--touch-left);
+  right: var(--touch-right);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 12px;
+  pointer-events: none;
+}
+#touchTelemetry {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-width: 330px;
+  gap: 4px;
+  padding: 5px 8px;
+  border: 1px solid #aaca8c40;
+  border-radius: 8px;
+  background: #101b1ae0;
+}
+#touchTelemetry span {
+  display: block;
+  color: #bbcab9;
+  font-size: 10px;
+}
+#touchTelemetry b {
+  display: block;
+  color: #d8edc1;
+  font-size: 16px;
+}
+#touchTelemetry .critical {
+  color: #ffab76;
+}
 #touchTop {
-  z-index: 2;
+  display: flex;
+  gap: 6px;
+  pointer-events: auto;
 }
-
-/* --- left: the stick ------------------------------------------------------ */
-/* The cockpit draws its instrument row between 78% and 96.4% of the canvas height. Every
-   control is anchored above that band, in percentage terms, so the armour diagram, the
-   radar and the weapon bay stay readable at any aspect ratio instead of being covered by
-   a thumb. `--hud-clear` is that band plus a margin. */
-#touch {
-  --hud-clear: calc(24% + 10px);
+#touchMission {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: #d8edc1;
 }
-
+#touchMission b,
+#touchMission span {
+  min-width: 0;
+}
+#touchMission span {
+  text-align: right;
+}
+#touchRadio {
+  grid-column: 1 / -1;
+  max-width: 640px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #e5e0cf;
+}
 #touchStick {
   position: absolute;
-  left: max(16px, env(safe-area-inset-left, 0px));
-  bottom: var(--hud-clear);
-  width: 140px;
-  height: 140px;
+  left: var(--touch-left);
+  bottom: var(--touch-bottom);
+  width: 128px;
+  height: 128px;
   touch-action: none;
 }
-
 .stick-ring {
   position: absolute;
   inset: 0;
-  border: 1px solid rgba(200, 209, 182, 0.28);
+  border: 1px solid #aaca8c88;
   border-radius: 50%;
-  background:
-    radial-gradient(circle at 50% 50%, rgba(23, 32, 29, 0.5), rgba(23, 32, 29, 0.78) 70%),
-    repeating-conic-gradient(from 0deg, rgba(200, 209, 182, 0.07) 0deg 2deg, transparent 2deg 45deg);
-  box-shadow: inset 0 0 26px rgba(9, 14, 17, 0.6);
+  background: radial-gradient(circle, #21363077, #101b1abd);
 }
-
-/* Cross-hairs marking the two axes the stick drives. */
 .stick-ring::before,
 .stick-ring::after {
   content: '';
   position: absolute;
-  background: rgba(200, 209, 182, 0.16);
+  background: #c8d1b62c;
 }
-
 .stick-ring::before {
   left: 12%;
   right: 12%;
   top: 50%;
   height: 1px;
 }
-
 .stick-ring::after {
   top: 12%;
   bottom: 12%;
   left: 50%;
   width: 1px;
 }
-
 .stick-knob {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 58px;
-  height: 58px;
-  margin: -29px 0 0 -29px;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
   border-radius: 50%;
   border: 1px solid var(--accent);
-  background: rgba(245, 139, 81, 0.16);
-  box-shadow: 0 0 18px rgba(245, 139, 81, 0.25);
-  transition: background 0.12s;
+  background: #f58b5138;
   will-change: transform;
 }
-
 #touchStick.active .stick-knob {
-  background: rgba(245, 139, 81, 0.3);
+  background: #f58b516b;
 }
-
-.stick-label {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: -16px;
-  text-align: center;
-  font-size: 8px;
-  letter-spacing: 2px;
-  color: #8b978b;
-}
-
+.stick-label,
 .stick-readout {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: -17px;
   text-align: center;
-  font-size: 10px;
-  letter-spacing: 1.5px;
-  color: var(--green);
+  pointer-events: none;
 }
-
-/* --- buttons -------------------------------------------------------------- */
-.tbtn {
-  border: 1px solid rgba(200, 209, 182, 0.3);
-  background: rgba(23, 32, 29, 0.74);
-  color: var(--ink);
-  font: inherit;
-  font-size: 11px;
-  letter-spacing: 1.4px;
-  border-radius: 6px;
-  /* 56px is the smallest target that stays reliable for a thumb in motion. */
-  min-width: 56px;
-  min-height: 56px;
+.stick-label {
+  top: 12px;
+  font-size: 10px;
+  color: #d8edc1;
+}
+.stick-readout {
+  bottom: 12px;
+  font-size: 9px;
+  color: #d8edc1;
+}
+#touch .tbtn {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid #bdccb36b;
+  border-radius: 8px;
+  background: #14211fe6;
+  color: #eee9da;
   display: grid;
   place-content: center;
+  gap: 4px;
+  font: inherit;
+  font-size: 11px;
   touch-action: none;
-  backdrop-filter: blur(2px);
 }
-
-.tbtn:active,
-.tbtn.held {
-  background: rgba(245, 139, 81, 0.32);
-  border-color: var(--accent);
-  color: #fff;
+#touch .tbtn.held,
+#touch .tbtn:active {
+  background: #69442edf;
+  border-color: #f9b184;
 }
-
-.tbtn.fire {
-  min-width: 108px;
-  min-height: 108px;
+#touch .tbtn[aria-pressed='true'] {
+  border-color: #c2eba1;
+  background: #354834ee;
+  color: #e2f5cb;
+}
+#touch .tbtn:disabled {
+  opacity: 0.45;
+}
+#touch .tbtn span {
+  font-size: 10px;
+  font-weight: normal;
+}
+#touch .fire {
+  width: 104px;
+  height: 104px;
   border-radius: 50%;
-  font-size: 13px;
+  background: #6f452ace;
+  border: 2px solid #ffb17e;
+}
+#touch .fire b {
+  font-size: 18px;
   letter-spacing: 2px;
-  border-color: rgba(245, 139, 81, 0.6);
-  background: rgba(245, 139, 81, 0.16);
 }
-
-.tbtn.small,
-.tbtn.tiny {
-  min-width: 52px;
-  min-height: 40px;
+#touch .fire span {
   font-size: 9px;
-  letter-spacing: 1.2px;
 }
-
-.tbtn.tiny {
-  min-height: 34px;
-  background: rgba(23, 32, 29, 0.6);
+#touch .fire.cooling {
+  border-color: #8dc9db;
+  background: #224b5ada;
 }
-
-.tbtn.weapon {
-  min-width: 46px;
-  min-height: 46px;
-  font-size: 14px;
-}
-
-.tbtn.weapon.selected {
-  border-color: var(--green);
-  color: var(--green);
-  background: rgba(170, 202, 140, 0.16);
-}
-
-/* --- clusters ------------------------------------------------------------- */
 #touchPad {
   position: absolute;
-  right: max(14px, env(safe-area-inset-right, 0px));
-  bottom: var(--hud-clear);
-  display: grid;
-  grid-template-columns: auto auto;
-  grid-template-areas:
-    'tgt  fire'
-    'cool fire'
-    'jets fire';
-  gap: 7px;
-  align-items: center;
-}
-
-#touchPad [data-touch='fire'] {
-  grid-area: fire;
-}
-#touchPad [data-touch='jump'] {
-  grid-area: jets;
-}
-#touchPad [data-touch='target'] {
-  grid-area: tgt;
-}
-#touchPad [data-touch='coolant'] {
-  grid-area: cool;
-}
-
-#touchWeapons {
-  position: absolute;
-  right: max(14px, env(safe-area-inset-right, 0px));
-  bottom: calc(var(--hud-clear) + 190px);
+  right: var(--touch-right);
+  bottom: var(--touch-bottom);
   display: flex;
-  gap: 7px;
-}
-
-#touchLeftPad {
-  position: absolute;
-  left: max(16px, env(safe-area-inset-left, 0px));
-  bottom: calc(var(--hud-clear) + 150px);
-  display: flex;
-  gap: 7px;
-}
-
-#touchTop {
-  position: absolute;
-  top: max(10px, env(safe-area-inset-top, 0px));
-  right: max(18px, env(safe-area-inset-right, 0px));
-  display: flex;
+  align-items: flex-end;
   gap: 8px;
 }
-
-/* --- portrait ------------------------------------------------------------- */
-/* Playable, but the cockpit is built for a wide frame, so the menu asks for
-   landscape and the controls shrink to stay out of the HUD's way. */
+#touchPad [data-touch='jump'] {
+  min-height: 52px;
+}
+#touchWeapons {
+  position: absolute;
+  bottom: var(--touch-bottom);
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  width: 222px;
+}
+#touchWeapons .tbtn {
+  min-height: 52px;
+}
+#touchAssist {
+  position: absolute;
+  bottom: calc(var(--touch-bottom) + 64px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  color: #c4d0ba;
+  white-space: nowrap;
+  pointer-events: none;
+}
+#touchTarget,
+#touchNotice {
+  position: absolute;
+  pointer-events: none;
+  left: max(16px, env(safe-area-inset-left, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
+  text-align: center;
+  color: #ffcc95;
+  font-size: 11px;
+  line-height: 1.4;
+}
+#touchTarget {
+  top: 53%;
+}
+#touchNotice {
+  top: 59%;
+  color: #d5ebc4;
+}
+.touch-panel {
+  position: absolute;
+  z-index: 4;
+  top: calc(var(--touch-top) + 54px);
+  right: var(--touch-right);
+  bottom: var(--touch-bottom);
+  width: min(420px, calc(100% - var(--touch-left) - var(--touch-right)));
+  padding: 12px;
+  border: 1px solid #aaca8c88;
+  border-radius: 12px;
+  background: #0e1a19fa;
+  overflow: auto;
+  touch-action: pan-y;
+}
+.touch-panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  letter-spacing: 1px;
+}
+.touch-panel p {
+  color: #c8d1c0;
+  line-height: 1.6;
+  font-size: 12px;
+}
+.touch-tool-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+#touch .touch-tool-grid .tbtn {
+  min-height: 48px;
+}
+#touchMapPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(540px, calc(100% - var(--touch-left) - var(--touch-right)));
+}
+#touchMap {
+  width: 100%;
+  height: 0;
+  min-height: 100px;
+  flex: 1;
+}
+#touchMapPanel > span {
+  font-size: 10px;
+}
+.touch-device #touchWarn {
+  display: block;
+}
+.touch-help {
+  display: none;
+}
+.touch-device .touch-help {
+  display: block;
+  color: var(--green);
+}
+#touchSquad:empty {
+  display: none;
+}
+.touch-device #toast {
+  max-width: calc(100% - 24px);
+  font-size: 12px;
+}
+/* Panel buttons already show their state; transient hints must not cover the map. */
+.touch-device:has(.touch-panel:not([hidden])) #toast {
+  display: none;
+}
 @media (orientation: portrait) {
-  #touchStick {
-    width: 124px;
-    height: 124px;
-  }
-  .stick-knob {
-    width: 50px;
-    height: 50px;
-    margin: -25px 0 0 -25px;
-  }
-  .tbtn.fire {
-    min-width: 88px;
-    min-height: 88px;
-  }
   #touchWeapons {
-    bottom: calc(var(--hud-clear) + 168px);
+    bottom: calc(var(--touch-bottom) + 156px);
+    width: calc(100% - var(--touch-left) - var(--touch-right));
   }
-  #touchLeftPad {
-    bottom: calc(var(--hud-clear) + 134px);
+  #touchAssist {
+    bottom: calc(var(--touch-bottom) + 138px);
+  }
+  #touchHeader {
+    column-gap: 8px;
+  }
+  #touchTelemetry {
+    padding: 5px;
+  }
+  #touchTarget {
+    top: 50%;
+  }
+  #touchNotice {
+    top: 56%;
   }
 }
-
-/* A short landscape window — a phone held sideways — has no room for stacked rows. */
-@media (orientation: landscape) and (max-height: 430px) {
-  #touchStick {
-    width: 126px;
-    height: 126px;
-  }
-  .stick-knob {
-    width: 50px;
-    height: 50px;
-    margin: -25px 0 0 -25px;
-  }
-  .tbtn.fire {
-    min-width: 92px;
-    min-height: 92px;
-  }
-  .tbtn {
-    min-height: 46px;
-  }
+/* Also fit small phones in landscape without shrinking any tap target below 44px. */
+@media (orientation: landscape) and (max-width: 700px) {
   #touchWeapons {
-    bottom: calc(var(--hud-clear) + 150px);
+    width: 192px;
+    left: 48%;
   }
-  #touchLeftPad {
-    bottom: calc(var(--hud-clear) + 128px);
-  }
-  .tbtn.small,
-  .tbtn.tiny {
-    min-width: 46px;
-    min-height: 34px;
+  #touchAssist {
+    left: 48%;
     font-size: 8px;
   }
-  .tbtn.weapon {
-    min-width: 40px;
-    min-height: 40px;
+  #touchStick {
+    width: 116px;
+    height: 116px;
+  }
+  #touch .fire {
+    width: 96px;
+    height: 96px;
+  }
+  #touchRadio {
+    max-width: 75%;
+  }
+  #touchTarget {
+    top: 51%;
+    left: 145px;
+    right: 166px;
+  }
+  #touchNotice {
+    top: 61%;
+    left: 145px;
+    right: 166px;
+  }
+}
+@media (max-width: 350px) and (orientation: portrait) {
+  #touchHeader {
+    column-gap: 4px;
+  }
+  #touchTop {
+    gap: 4px;
+  }
+  #touchStick {
+    width: 112px;
+    height: 112px;
+  }
+  #touch .fire {
+    width: 92px;
+    height: 92px;
+  }
+  #touchTelemetry b {
+    font-size: 14px;
+  }
+  #touchMission {
+    font-size: 11px;
   }
 }

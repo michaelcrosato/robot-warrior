@@ -24,7 +24,7 @@ const ADDED_SINCE_BASELINE = new Set(['torso', 'pitch', 'tier', 'debug']);
  * Strip values that vary with wall-clock time so a diff only shows real drift.
  * @param {import('../../../src/types/globals').GameStatus} status
  */
-export function stable(status) {
+function stable(status) {
   const out = {};
   for (const [k, v] of Object.entries(status)) {
     if (VOLATILE.has(k) || ADDED_SINCE_BASELINE.has(k)) continue;
@@ -87,22 +87,6 @@ export async function probeBoot(page) {
  * CI failed on the one that had not been raised.
  */
 export const MISSION_START_TIMEOUT = 60_000;
-
-/**
- * Open the game, deploy, and wait until the mission is actually playable.
- *
- * @param {import('@playwright/test').Page} page
- * @param {{settle?: number}} [options] extra milliseconds to let frames run afterwards
- */
-export async function startMission(page, options = {}) {
-  await page.goto('/');
-  await waitForBoot(page);
-  await page.click('#startBtn');
-  await page.waitForFunction(() => window.RobotWarrior.getStatus().state === 'playing', null, {
-    timeout: MISSION_START_TIMEOUT,
-  });
-  if (options.settle) await page.waitForTimeout(options.settle);
-}
 
 /**
  * Entity types that never move once placed.

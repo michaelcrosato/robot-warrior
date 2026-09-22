@@ -64,12 +64,6 @@ export const caps = Object.freeze({
   colorBufferFloat: !!gl.getExtension('EXT_color_buffer_float'),
   /** Needed to filter RGBA16F. Without it the bloom chain must use NEAREST. */
   floatLinear: !!gl.getExtension('OES_texture_float_linear'),
-  /** Anisotropic filtering, when there is anything worth filtering. */
-  anisotropic: gl.getExtension('EXT_texture_filter_anisotropic'),
-  maxTextureSize: gl.getParameter(gl.MAX_TEXTURE_SIZE),
-  maxTextureUnits: gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS),
-  maxArrayLayers: gl.getParameter(gl.MAX_ARRAY_TEXTURE_LAYERS),
-  maxSamples: gl.getParameter(gl.MAX_SAMPLES),
   /** Reported by the browser, not the GPU; used only as one signal among several. */
   deviceMemory: navigator.deviceMemory || 0,
   hardwareConcurrency: navigator.hardwareConcurrency || 0,
@@ -78,8 +72,3 @@ export const caps = Object.freeze({
     typeof matchMedia === 'function' && matchMedia('(hover: none) and (pointer: coarse)').matches,
   maxTouchPoints: navigator.maxTouchPoints || 0,
 });
-
-/** Anisotropy level to request, or 0 when the extension is missing. */
-export const maxAnisotropy = caps.anisotropic
-  ? gl.getParameter(caps.anisotropic.MAX_TEXTURE_MAX_ANISOTROPY_EXT)
-  : 0;

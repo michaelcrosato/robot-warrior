@@ -22,6 +22,7 @@ import { pausedFrom } from '../sim/player.js';
 import { pools, structures } from '../entities/pools.js';
 import { solidObstacles } from '../world/level.js';
 import { sound } from '../audio/sound-system.js';
+import { drawMobileHUD } from './mobile.js';
 
 function drawBoot() {
   const w = camera.screenW,
@@ -188,8 +189,11 @@ export function soloDrawHUD() {
   ctx.clearRect(0, 0, camera.screenW, camera.screenH);
   if (G.state === 'menu') return;
   G.hudScale = clamp(Math.min(camera.screenW / 1440, camera.screenH / 860), 0.65, 1.55);
-  drawFlightHUD();
-  drawCockpit();
+  if (G.touchMode) drawMobileHUD();
+  else {
+    drawFlightHUD();
+    drawCockpit();
+  }
   if (G.imagingSwitch > 0) {
     ctx.fillStyle = 'rgba(104,226,177,' + G.imagingSwitch * 0.14 + ')';
     ctx.fillRect(0, 0, camera.screenW, camera.screenH * 0.74);
@@ -203,7 +207,7 @@ export function soloDrawHUD() {
     );
   }
   if (G.state === 'boot' || (G.state === 'paused' && pausedFrom === 'boot')) drawBoot();
-  if (G.mapOpen) drawMap();
+  if (G.mapOpen && !G.touchMode) drawMap();
   if (G.damageFlash > 0) {
     const g = ctx.createRadialGradient(
       camera.screenW * 0.5,

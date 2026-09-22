@@ -16,3 +16,4 @@ a new record that supersedes it.
 | [0005](0005-no-runtime-dependencies.md)               | Ship no runtime dependencies                         | Accepted |
 | [0006](0006-webgl2-render-pipeline.md)                | Rebuild the renderer on WebGL 2                      | Accepted |
 | [0007](0007-touch-controls.md)                        | Touch controls feeding the existing input state      | Accepted |
+| [0008](0008-two-thumb-mobile-cockpit.md)              | Two-thumb mobile cockpit and local input assists     | Accepted |

@@ -66,11 +66,15 @@ jobs:
         run: node scripts/bundle-single.mjs
 
       - name: Upload Playwright report
-        if: failure()
+        if: failure() || cancelled()
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report
-          path: playwright-report/
+          # A cancelled suite may not finish its HTML report; completed tests still
+          # leave traces and screenshots in test-results.
+          path: |
+            playwright-report/
+            test-results/
           retention-days: 7
 
       - name: Upload coverage

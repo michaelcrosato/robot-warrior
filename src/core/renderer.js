@@ -16,9 +16,6 @@ import { MATERIAL, SUN_DIR, SUN_COLOR, MOON_DIR } from './lighting.js';
 
 let currentVao = null;
 
-/** The program `draw()` is currently feeding. Swapped by the pass, not by call sites. */
-let activePrg = scenePrg;
-
 /**
  * State for the render pass in flight.
  *
@@ -32,11 +29,9 @@ export const pass = {
   /** 'scene' or 'shadow'. */
   mode: 'scene',
   material: MATERIAL.terrain,
-  /** Set while rendering a cascade, so `draw` can skip anything that must not cast. */
-  cascade: 0,
 };
 
-/** Convenience for call sites: `withMaterial(MATERIAL.armor, () => { ... })`. */
+/** Select a surface preset for subsequent draws: `setMaterial(MATERIAL.armor)`. */
 export function setMaterial(material) {
   pass.material = material;
 }
@@ -277,7 +272,6 @@ export function blendEnd() {
 /** Switch the renderer into depth-only cascade rendering. */
 export function beginShadowPass(lightMatrix) {
   pass.mode = 'shadow';
-  activePrg = shadowPrg;
   currentVao = null;
   gl.useProgram(shadowPrg.p);
   gl.uniformMatrix4fv(shadowPrg.uLightVP, false, lightMatrix);
@@ -292,7 +286,6 @@ export function beginShadowPass(lightMatrix) {
 
 export function endShadowPass() {
   pass.mode = 'scene';
-  activePrg = scenePrg;
   currentVao = null;
   gl.disable(gl.CULL_FACE);
   gl.cullFace(gl.BACK);
@@ -329,11 +322,5 @@ export function renderSky() {
   gl.enable(gl.DEPTH_TEST);
   gl.clear(gl.DEPTH_BUFFER_BIT);
   gl.useProgram(scenePrg.p);
-  activePrg = scenePrg;
   gl.disable(gl.CULL_FACE);
-}
-
-/** The program currently bound, for the passes that need to check. */
-export function currentProgram() {
-  return activePrg;
 }

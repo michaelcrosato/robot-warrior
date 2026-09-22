@@ -19,7 +19,7 @@ import { fps, frame } from './loop.js';
 import { initCoop } from './net/coop-bridge.js';
 import { initInput } from './ui/input.js';
 import { initMenu, updateChassisUI } from './ui/menu.js';
-import { initTouch } from './ui/touch.js';
+import { getControlStatus, initTouch } from './ui/touch.js';
 import { scanTargets } from './render/pipeline.js';
 import { pools } from './entities/pools.js';
 import { sound } from './audio/sound-system.js';
@@ -56,6 +56,7 @@ Object.defineProperty(window, 'RobotWarrior', {
   value: Object.freeze({
     version: '4.0.0',
     getCoopStatus: () => G.coop.status(),
+    getControlStatus,
     scanTargets,
     getStatus: () => ({
       state: G.state,

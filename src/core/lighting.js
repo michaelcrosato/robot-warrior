@@ -137,10 +137,6 @@ export const MATERIAL = {
   armor: [0.52, 0.28, 0.35, 0.1],
   /** Bare structural metal, joints, weapon barrels. */
   metal: [0.34, 0.85, 0.15, 0.14],
-  /** Concrete, blast walls, prefab buildings. */
-  concrete: [0.88, 0.0, 0.8, 0.0],
-  /** Glass and sensor housings. */
-  glass: [0.12, 0.1, 0.0, 0.5],
   /** Anything emissive; lighting is bypassed but the values must still be valid. */
   emissive: [0.6, 0.0, 0.0, 0.0],
 };

@@ -72,10 +72,18 @@ rearm, once per bay.
 ### On a phone
 
 Touch controls appear automatically on a device with a coarse pointer, once a mission
-starts. Hold it sideways. Left stick: throttle up and down, legs left and right — release
-it and your speed holds, because it is a throttle lever rather than a pedal. Drag anywhere
-on the right to swing the torso. Fire, jets, target and coolant sit under your right thumb,
-weapon groups above them.
+starts, in portrait or landscape. Use the left stick to move and turn; release it to stop.
+Hold FIRE and drag with your right thumb to aim and shoot together. Drag the view to look
+without firing. Hold JETS to jump and tap a named weapon to select it.
+
+Targets near the sight select automatically, moving straight aligns the legs to your aim,
+and sustained fire pauses to cool before overheating. MAP shows the mission route. SYS
+contains zoom, imaging, night vision, coolant, waypoints and help. Coolant remains manual.
+In co-op, stop near a downed teammate to restore them automatically.
+
+`pnpm verify` includes native multi-touch tests at 360 × 640 (9:16) and 640 × 360 (16:9).
+The mobile tests save screenshots of the menu, cockpit, systems, map, pause and gestures
+under `test-results/`, alongside assertions for touch target size, overlap and hit testing.
 
 Render quality is picked for your device and can be overridden in the mission screen.
 

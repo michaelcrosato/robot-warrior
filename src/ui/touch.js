@@ -1,343 +1,490 @@
-/**
- * Touch controls.
- *
- * A walking tank is a two-handed machine — throttle and legs in one hand, torso and
- * weapons in the other — and that maps onto a phone held sideways better than it has any
- * right to. Left thumb: a stick driving throttle on its vertical axis and leg turn on its
- * horizontal. Right thumb: drag anywhere to swing the torso, with the action cluster under
- * where the thumb already rests.
- *
- * Everything here feeds the same state the keyboard and mouse write to — `G.keys`,
- * `G.mouse`, `G.player.torso` — so the simulation has no idea which is in use and there is
- * no second input path to keep in step.
- *
- * One deliberate difference: throttle is set directly from the stick rather than by
- * emulating taps on W and S. The underlying value is analogue (-0.45 reverse to 1 full),
- * and a stick that drives it directly is both simpler and better to use than one
- * pretending to hold a key down.
- */
+/** Two-thumb controls: assists feed ordinary inputs before solo simulation or co-op sampling. */
 import { $, $$ } from '../core/dom.js';
 import { G } from '../sim/state.js';
 import { caps } from '../core/gl.js';
-import { chooseTarget } from '../sim/combat.js';
-import { clamp } from '../core/math.js';
+import { inputHint } from '../core/input-hints.js';
+import { clearLOS, fireOrigin, forward, weaponDisabled } from '../sim/combat.js';
+import { clamp, dist2, dot, norm, vsub, wrap } from '../core/math.js';
 import { coolant, pauseGame } from '../net/coop-bridge.js';
-import { navPoints } from '../hud/cockpit.js';
+import { missionObjectives, navPoints } from '../hud/cockpit.js';
+import { drawTacticalMap } from '../hud/screens.js';
+import { playerArmor } from '../sim/player.js';
+import { center } from '../entities/draw.js';
+import { pools } from '../entities/pools.js';
+import { extraction, flightLink, serviceBay, supplyBay } from '../world/sites.js';
+import { allObjectivesComplete } from '../entities/spawn.js';
+import { landingThreats } from '../sim/mission.js';
 import { settings } from '../core/settings.js';
 import { sound } from '../audio/sound-system.js';
 import { toggleImaging } from '../sim/update.js';
+import { openManual } from './menu.js';
+import { canAutoRestore, heatLimited, pickTouchTarget, stickInput } from './touch-math.js';
 
-/** Fraction of the stick's radius ignored around centre, so resting a thumb does nothing. */
-const DEADZONE = 0.16;
-
-/** How far the knob travels, in CSS pixels. Matches the ring in game.css. */
-const STICK_RADIUS = 46;
-
-/** Beyond this the leg turn engages. Below it the legs hold their heading. */
-const TURN_THRESHOLD = 0.3;
-
-let enabled = false;
 let stickPointer = null;
 let aimPointer = null;
 let stickOrigin = { x: 0, y: 0 };
+let stickRadius = 42;
 let lastAim = { x: 0, y: 0 };
+let holdingFire = false;
+let cooling = false;
+let toolsOpen = false;
+let readoutClock = 0;
+let targetClock = 0;
+let controlsActive = false;
+const presses = new Map();
 
-/**
- * Whether this device should get touch controls.
- *
- * A laptop with a touchscreen reports touch points but also has a fine pointer, and
- * covering a quarter of its screen with thumb controls would be wrong. The deciding
- * signal is a *coarse* primary pointer.
- */
 export function touchAvailable() {
   return caps.coarsePointer || (caps.maxTouchPoints > 0 && !matchMedia('(hover: hover)').matches);
 }
 
-/**
- * Take pointer capture, tolerating a pointer that has already gone.
- *
- * `setPointerCapture` throws NotFoundError if the pointer is no longer active, which a
- * quick tap manages routinely — the browser can deliver pointerdown and pointerup close
- * enough together that the pointer is released before the handler runs. Thrown from the
- * top of a handler it aborts the rest of it, which is how a fast tap on a button silently
- * did nothing while a slow press worked. Capture is an enhancement here, so losing it is
- * fine; losing the action is not.
- */
+function running() {
+  return (G.state === 'playing' || G.state === 'boot') && !G.coop?.localMenu;
+}
+
+function driving() {
+  return running() && G.player.alive && !G.coop?.held && !toolsOpen && !G.mapOpen;
+}
+
 function capture(element, pointerId) {
   try {
     element.setPointerCapture(pointerId);
   } catch {
-    // Pointer already released — the press still counts.
+    // Fast taps can be released before capture; their action must still count.
   }
-}
-
-/** Release every held control. Used when the controls are hidden mid-mission. */
-function releaseAll() {
-  G.keys.KeyA = false;
-  G.keys.KeyD = false;
-  G.keys.ShiftLeft = false;
-  G.mouse.down = false;
-  G.mouse.drag = false;
-  stickPointer = null;
-  aimPointer = null;
-  const stick = $('touchStick');
-  if (stick) {
-    stick.classList.remove('active');
-    setKnob(0, 0);
-  }
-  for (const b of $$('#touch .tbtn')) b.classList.remove('held');
 }
 
 function setKnob(x, y) {
-  const knob = $('stickKnob');
-  if (knob) knob.style.transform = `translate(${x * STICK_RADIUS}px, ${y * STICK_RADIUS}px)`;
+  $('stickKnob').style.transform = `translate(${x * stickRadius}px, ${y * stickRadius}px)`;
 }
 
-/** Apply a stick position, both axes normalised to -1..1. */
-function applyStick(nx, ny) {
-  setKnob(nx, ny);
-
-  // Vertical: forward is up, so the screen's downward axis is inverted. The full range is
-  // asymmetric because the mech reverses at a fraction of its forward speed.
-  const forward = -ny;
-  const magnitude = Math.abs(forward);
-  G.player.throttle =
-    magnitude < DEADZONE
-      ? 0
-      : clamp(
-          Math.sign(forward) * ((magnitude - DEADZONE) / (1 - DEADZONE)) * (forward > 0 ? 1 : 0.45),
-          -0.45,
-          1,
-        );
-
-  // Horizontal: the legs turn at a fixed rate, so this is a threshold rather than a ramp.
-  G.keys.KeyA = nx < -TURN_THRESHOLD;
-  G.keys.KeyD = nx > TURN_THRESHOLD;
-
-  const readout = $('stickReadout');
-  if (readout) readout.textContent = Math.round(G.player.throttle * 100) + '%';
+function stopStick() {
+  stickPointer = null;
+  G.player.throttle = 0;
+  G.player.align = false;
+  G.keys.KeyA = false;
+  G.keys.KeyD = false;
+  $('touchStick').classList.remove('active');
+  setKnob(0, 0);
 }
 
-/** One-shot and held actions, keyed by the `data-touch` attribute. */
+/** Interruptions must stop the mech, not leave an invisible throttle or held weapon. */
+function releaseAll() {
+  stopStick();
+  aimPointer = null;
+  holdingFire = false;
+  cooling = false;
+  G.keys.ShiftLeft = false;
+  G.keys.KeyJ = false;
+  G.mouse.down = false;
+  G.mouse.drag = false;
+  // Clear ownership before releasing capture: lostpointercapture can arrive immediately.
+  presses.clear();
+  for (const el of $$('#touch .held')) el.classList.remove('held');
+}
+
+function applyStick(e) {
+  const input = stickInput(e.clientX - stickOrigin.x, e.clientY - stickOrigin.y, stickRadius);
+  setKnob(input.x, input.y);
+  G.player.throttle = input.throttle;
+  G.keys.KeyA = input.turn < 0;
+  G.keys.KeyD = input.turn > 0;
+  // Existing gradual alignment preserves the sight's heading while the legs catch up.
+  G.player.align = input.turn === 0 && Math.abs(input.throttle) > 0.05;
+  G.player.centerTorso = false;
+}
+
+function beginAim(e) {
+  if (aimPointer !== null) return;
+  aimPointer = e.pointerId;
+  lastAim = { x: e.clientX, y: e.clientY };
+}
+
+function moveAim(e) {
+  if (e.pointerId !== aimPointer || !driving()) return;
+  const dx = e.clientX - lastAim.x;
+  const dy = e.clientY - lastAim.y;
+  lastAim = { x: e.clientX, y: e.clientY };
+  const sensitivity = settings.sensitivity * 0.0052 * (G.zoom ? 0.5 : 1);
+  G.player.torso = clamp(G.player.torso + dx * sensitivity, -1.68, 1.68);
+  G.player.pitch = clamp(
+    G.player.pitch - dy * sensitivity * (settings.invert ? -1 : 1),
+    -0.62,
+    0.6,
+  );
+  G.player.centerTorso = false;
+  e.preventDefault();
+}
+
+function syncPanels() {
+  $('touchTools').hidden = !toolsOpen;
+  $('touchMapPanel').hidden = !G.mapOpen;
+  $('touchControls').hidden = toolsOpen || G.mapOpen || !G.player.alive || !!G.coop?.held;
+  for (const b of $$('#touchTop [aria-expanded]'))
+    b.setAttribute('aria-expanded', String(b.dataset.touch === 'map' ? G.mapOpen : toolsOpen));
+}
+
 function pressAction(name, element) {
   switch (name) {
     case 'fire':
-      G.mouse.down = true;
+      holdingFire = true;
       break;
     case 'jump':
       G.keys.ShiftLeft = true;
       break;
-    case 'target':
-      chooseTarget();
+    case 'weapon':
+      G.weaponIndex = Number(element.dataset.index);
+      sound.fxPlay('beep');
       break;
     case 'coolant':
       coolant();
       break;
-    case 'stop':
-      G.player.throttle = 0;
-      break;
-    case 'align':
-      G.player.align = true;
-      G.player.centerTorso = false;
-      break;
-    case 'center':
-      G.player.centerTorso = true;
-      G.player.align = false;
-      break;
     case 'imaging':
       toggleImaging();
       break;
+    case 'vision':
+      G.player.vision = !G.player.vision;
+      break;
     case 'zoom':
       G.zoom = !G.zoom;
-      sound.fxPlay('beep');
       break;
     case 'map':
+      releaseAll();
       G.mapOpen = !G.mapOpen;
-      sound.fxPlay('beep');
+      toolsOpen = false;
+      syncPanels();
+      break;
+    case 'systems':
+      releaseAll();
+      toolsOpen = !toolsOpen;
+      G.mapOpen = false;
+      syncPanels();
       break;
     case 'nav': {
       const n = navPoints()
         .map((p, i) => (p.active && !p.done ? i : -1))
         .filter((i) => i >= 0);
       G.navIndex = n[(n.indexOf(G.navIndex) + 1) % n.length] ?? 0;
-      sound.say('nav');
+      toolsOpen = false;
+      syncPanels();
       break;
     }
+    case 'help':
+      releaseAll();
+      openManual();
+      break;
     case 'pause':
+      releaseAll();
       pauseGame();
       break;
-    case 'weapon': {
-      const index = Number(element.dataset.index);
-      G.weaponIndex = index;
-      sound.fxPlay('beep');
-      syncWeapons();
-      break;
+  }
+  readoutClock = 0;
+}
+
+function endPointer(e) {
+  if (e.pointerId === stickPointer) stopStick();
+  if (e.pointerId === aimPointer) aimPointer = null;
+  const held = presses.get(e.pointerId);
+  if (!held) return;
+  presses.delete(e.pointerId);
+  held.element.classList.remove('held');
+  if (held.name === 'fire') {
+    holdingFire = false;
+    G.mouse.down = false;
+    cooling = false;
+  }
+  if (held.name === 'jump') G.keys.ShiftLeft = false;
+}
+
+function selectTarget() {
+  const origin = fireOrigin();
+  const direction = forward();
+  const candidates = [];
+  for (const entity of pools.entities) {
+    if (!entity.alive) continue;
+    const point = center(entity);
+    const delta = vsub(point, origin);
+    const distance = Math.hypot(...delta);
+    const alignment = dot(norm(delta), direction);
+    if (distance > G.weapons[2].range || alignment < 0.95) continue;
+    candidates.push({ entity, distance, alignment, visible: clearLOS(origin, point) });
+  }
+  const next = pickTouchTarget(candidates, G.target);
+  if (next !== G.target) {
+    G.target = next;
+    G.lock = 0;
+    G.lockSpoken = false;
+  }
+}
+
+function setText(id, value) {
+  const el = $(id);
+  if (el.textContent !== value) el.textContent = value;
+}
+
+function missionNotice() {
+  for (const bay of [
+    { site: serviceBay, active: G.missionFlags[2] && !G.serviceUsed, time: G.serviceTime },
+    {
+      site: supplyBay,
+      active: G.missionFlags[3] && G.missionFlags[4] && !G.supplyUsed,
+      time: G.supplyTime,
+    },
+  ]) {
+    if (!bay.active || dist2(G.player, bay.site) >= bay.site.r + 10) continue;
+    if (dist2(G.player, bay.site) >= bay.site.r) return 'MOVE INSIDE THE REPAIR RING';
+    return G.player.altitude >= 3
+      ? 'LAND IN THE REPAIR RING'
+      : Math.abs(G.player.speed) >= 1.5
+        ? 'RELEASE MOVE TO REPAIR'
+        : `REPAIRING · ${Math.max(0, 6 - bay.time).toFixed(1)}s`;
+  }
+  if (G.missionStage === 'link')
+    return `FLIGHT LINK ${Math.floor((G.linkTime / flightLink.duration) * 100)}% · ${inputHint(G.linkStatus, true)}`;
+  if (allObjectivesComplete() && dist2(G.player, extraction) < extraction.r + 35) {
+    if (G.transportTime < 14) return `TRANSPORT INBOUND · ${Math.ceil(14 - G.transportTime)}s`;
+    if (landingThreats().length) return 'LANDING ZONE CONTESTED';
+    if (Math.abs(G.player.speed) >= 2.2) return 'RELEASE MOVE FOR EXTRACTION';
+    if (G.player.altitude >= 3) return 'LAND INSIDE EXTRACTION';
+    return `HOLD POSITION · ${Math.max(0, 5 - G.extractTime).toFixed(1)}s`;
+  }
+  return '';
+}
+
+function updateReadouts() {
+  setText('touchArmor', `${Math.round(playerArmor() * 100)}%`);
+  setText('touchHeat', `${Math.round(G.player.heat)}%`);
+  $('touchHeat').classList.toggle('critical', G.player.heat > 75);
+  setText('touchFuel', `${Math.round(G.player.fuel)}%`);
+  setText(
+    'stickReadout',
+    stickPointer === null ? 'RELEASE TO STOP' : `${Math.round(G.player.speed * 3.6)} KM/H`,
+  );
+  setText('touchObjective', missionObjectives().find((o) => !o[1])?.[0] || 'SECTOR SECURED');
+  const points = navPoints();
+  if (!points[G.navIndex]?.active || points[G.navIndex]?.done) {
+    const next = points.findIndex((p) => p.active && !p.done && !p.service);
+    if (next >= 0) G.navIndex = next;
+  }
+  const waypoint = points[G.navIndex];
+  const angle = waypoint
+    ? wrap(
+        Math.atan2(waypoint.x - G.player.x, -(waypoint.z - G.player.z)) -
+          G.player.yaw -
+          G.player.torso,
+      )
+    : 0;
+  setText(
+    'touchNav',
+    waypoint?.active && !waypoint.done
+      ? `${Math.abs(angle) < 0.3 ? '↑' : angle > 0 ? '→' : '←'} ${waypoint.name} · ${Math.round(dist2(G.player, waypoint))} M`
+      : 'CLEAR REMAINING HOSTILES',
+  );
+  // Network radio events arrive directly in G.radio, so adapt at the local display seam.
+  setText('touchRadio', inputHint(G.radio.at(-1)?.text || '', true));
+  const target = G.target?.alive ? G.target : null;
+  setText(
+    'touchTarget',
+    target
+      ? `${target.name} · ${Math.round(dist2(G.player, target))} M · ${G.lock >= 1 ? 'LOCKED' : Math.round(G.lock * 100) + '%'}`
+      : '',
+  );
+  setText(
+    'touchNotice',
+    !G.player.alive
+      ? 'MECH DOWN · WAIT FOR YOUR TEAM'
+      : G.coop?.held
+        ? 'HOST PAUSED · PAUSE MENU AVAILABLE'
+        : G.state === 'boot'
+          ? 'SYSTEMS STARTING'
+          : G.player.shutdown > 0
+            ? 'REACTOR COOLING'
+            : cooling
+              ? 'HEAT GUARD · COOLING'
+              : weaponDisabled(G.weaponIndex)
+                ? 'WEAPON DISABLED · SELECT ANOTHER'
+                : holdingFire && G.weaponIndex === 2 && G.lock < 1
+                  ? 'HOLD SIGHT ON TARGET TO LOCK'
+                  : missionNotice(),
+  );
+  for (const b of $$('#touchWeapons .weapon')) {
+    const index = Number(b.dataset.index);
+    const w = G.weapons[index];
+    const active = index === G.weaponIndex;
+    b.classList.toggle('selected', active);
+    b.setAttribute('aria-pressed', String(active));
+    const label =
+      w.remaining > 0
+        ? `${w.remaining.toFixed(1)}s`
+        : index === 0
+          ? 'READY'
+          : String(index === 1 ? G.player.ammo : G.player.missiles);
+    const text = weaponDisabled(index) ? 'DISABLED' : active && cooling ? 'COOLING' : label;
+    if (b.lastElementChild.textContent !== text) b.lastElementChild.textContent = text;
+    b.title = w.name;
+  }
+  $('touchPad').querySelector('.fire').classList.toggle('cooling', cooling);
+  for (const b of $$('#touchTools [aria-pressed]')) {
+    const on =
+      b.dataset.touch === 'zoom'
+        ? G.zoom
+        : b.dataset.touch === 'imaging'
+          ? G.player.imaging
+          : G.player.vision;
+    b.setAttribute('aria-pressed', String(on));
+  }
+  const cool = $('touchTools').querySelector('[data-touch="coolant"]');
+  cool.textContent = `COOLANT ${G.player.coolants}`;
+  cool.disabled = G.player.coolants <= 0 || G.player.heat < 12 || !G.player.alive || !!G.coop?.held;
+  setText(
+    'touchSquad',
+    G.coop?.active
+      ? [...G.coop.members.values()]
+          .map((member) => {
+            const pilot = G.coop.playerOf(member);
+            return `${member.name} · ${pilot?.alive ? 'ONLINE' : 'DOWN'}`;
+          })
+          .join(' / ') + ' · Stop near a downed ally to restore them automatically.'
+      : '',
+  );
+  if (G.mapOpen) {
+    const canvas = /** @type {HTMLCanvasElement} */ ($('touchMap'));
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(height * dpr)) {
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
     }
+    const context = canvas.getContext('2d');
+    context.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawTacticalMap(context, 0, 0, width, height, true);
   }
 }
 
-function releaseAction(name) {
-  if (name === 'fire') G.mouse.down = false;
-  if (name === 'jump') G.keys.ShiftLeft = false;
-}
-
-/** Mark the selected weapon, so the pad agrees with the HUD. */
-export function syncWeapons() {
-  for (const b of $$('#touchWeapons .tbtn')) {
-    b.classList.toggle('selected', Number(b.dataset.index) === G.weaponIndex);
+/** Never run from a replayed or remote-owned pilot step. */
+export function updateTouch(dt) {
+  if (!G.touchMode) return;
+  const visible = running();
+  const layer = $('touch');
+  if (layer.hidden === visible) {
+    releaseAll();
+    toolsOpen = false;
+    layer.hidden = !visible;
+    layer.setAttribute('aria-hidden', String(!visible));
+    readoutClock = 0;
+    syncPanels();
+  }
+  const active = driving();
+  if (controlsActive && !active) releaseAll();
+  controlsActive = active;
+  if (!visible) return;
+  if (active && G.state === 'playing') {
+    G.keys.KeyJ = !!G.coop?.active && canAutoRestore(G.player);
+    targetClock -= dt;
+    if (targetClock <= 0) {
+      selectTarget();
+      targetClock = 0.15;
+    }
+    if (stickPointer !== null && !G.keys.KeyA && !G.keys.KeyD && Math.abs(G.player.throttle) > 0.05)
+      G.player.align = true;
+    cooling = holdingFire && heatLimited(cooling, G.player.heat, G.weapons[G.weaponIndex].heat);
+    G.mouse.down = holdingFire && !cooling;
+  }
+  readoutClock -= dt;
+  if (readoutClock <= 0) {
+    syncPanels();
+    updateReadouts();
+    readoutClock = 0.1;
   }
 }
 
-/** Show or hide the whole layer. */
-export function setTouchVisible(visible) {
-  const layer = $('touch');
-  if (!layer) return;
-  if (!visible) releaseAll();
-  layer.hidden = !visible;
-  layer.setAttribute('aria-hidden', visible ? 'false' : 'true');
-  if (visible) syncWeapons();
-}
-
-/**
- * Called every frame from the loop: the controls belong to a running mission only, so the
- * menu, the briefing and the pause screen are not covered by them.
- */
-export function updateTouchVisibility() {
-  if (!enabled) return;
-  const playing = G.state === 'playing' || G.state === 'boot';
-  const layer = $('touch');
-  if (!layer) return;
-  if (layer.hidden === playing) setTouchVisible(playing);
-  // The selected weapon changes from the pad, the keyboard, the scroll wheel and the
-  // co-op layer. Reconciling three class toggles per frame is cheaper than remembering to
-  // notify from all four.
-  if (playing) syncWeapons();
+/** Observe real input without a test-only mutation API. */
+export function getControlStatus() {
+  return {
+    touch: G.touchMode,
+    throttle: G.player.throttle,
+    yaw: G.player.yaw,
+    fire: G.mouse.down,
+    jets: !!G.keys.ShiftLeft,
+    turning: !!(G.keys.KeyA || G.keys.KeyD),
+    aligning: G.player.align,
+    weapon: G.weaponIndex,
+    target: G.target?.name ?? null,
+    lock: G.lock,
+    cooling,
+    shots: G.shotsFired,
+    fuel: G.player.fuel,
+    coolants: G.player.coolants,
+  };
 }
 
 export function initTouch() {
-  enabled = touchAvailable();
-  if (!enabled) return;
-
-  // The menu's advice is wrong on a phone.
-  const hint = $('inputHint');
-  if (hint) hint.textContent = 'TOUCH CONTROLS · TURN SIDEWAYS · HEADPHONES RECOMMENDED';
-
-  const layer = $('touch');
+  G.touchMode = touchAvailable();
+  if (!G.touchMode) return;
+  document.body.classList.add('touch-device');
+  $('inputHint').textContent = 'TOUCH CONTROLS · TWO THUMBS · PORTRAIT OR LANDSCAPE';
+  $('manualBtn').textContent = 'FIELD MANUAL';
+  document.querySelector('label[for="sensitivity"]').textContent = 'Aim sensitivity';
+  document.querySelector('label[for="invert"]').textContent = 'Invert aim Y';
+  document.querySelector('label[for="enhancedView"]').textContent = 'Enhanced Imaging';
   const stick = $('touchStick');
   const aim = $('touchAim');
-
-  // --- the stick ------------------------------------------------------------
   stick.addEventListener('pointerdown', (e) => {
-    if (stickPointer !== null) return;
+    if (!driving() || stickPointer !== null) return;
     stickPointer = e.pointerId;
-    capture(stick, e.pointerId);
-    stick.classList.add('active');
     const rect = stick.getBoundingClientRect();
     stickOrigin = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    stickRadius = rect.width * 0.33;
+    stick.classList.add('active');
+    applyStick(e);
+    capture(stick, e.pointerId);
     e.preventDefault();
   });
-
   stick.addEventListener('pointermove', (e) => {
-    if (e.pointerId !== stickPointer) return;
-    const dx = (e.clientX - stickOrigin.x) / STICK_RADIUS;
-    const dy = (e.clientY - stickOrigin.y) / STICK_RADIUS;
-    const length = Math.hypot(dx, dy);
-    const scale = length > 1 ? 1 / length : 1;
-    applyStick(dx * scale, dy * scale);
+    if (e.pointerId !== stickPointer || !driving()) return;
+    applyStick(e);
     e.preventDefault();
   });
-
-  const endStick = (e) => {
-    if (e.pointerId !== stickPointer) return;
-    stickPointer = null;
-    stick.classList.remove('active');
-    // Release the stick and the legs stop, but the throttle holds — this is a throttle
-    // lever, not a spring-loaded pedal, and the mech is meant to keep its set speed.
-    G.keys.KeyA = false;
-    G.keys.KeyD = false;
-    setKnob(0, 0);
-  };
-  stick.addEventListener('pointerup', endStick);
-  stick.addEventListener('pointercancel', endStick);
-
-  // --- aim ------------------------------------------------------------------
   aim.addEventListener('pointerdown', (e) => {
-    if (aimPointer !== null) return;
-    aimPointer = e.pointerId;
+    if (!driving() || aimPointer !== null) return;
+    beginAim(e);
     capture(aim, e.pointerId);
-    lastAim = { x: e.clientX, y: e.clientY };
     e.preventDefault();
   });
-
-  aim.addEventListener('pointermove', (e) => {
-    if (e.pointerId !== aimPointer) return;
-    if (G.state !== 'playing' && G.state !== 'boot') return;
-
-    // Relative drag, like a trackpad. Absolute positioning would mean the torso jumping to
-    // wherever a thumb first lands, which is unusable.
-    const dx = e.clientX - lastAim.x;
-    const dy = e.clientY - lastAim.y;
-    lastAim = { x: e.clientX, y: e.clientY };
-
-    // A thumb travels far less than a mouse, so touch needs a higher factor than the
-    // mouse path uses for the same setting to feel equivalent.
-    const sensitivity = settings.sensitivity * 0.0052 * (G.zoom ? 0.5 : 1);
-    G.player.torso = clamp(G.player.torso + dx * sensitivity, -1.68, 1.68);
-    G.player.pitch = clamp(
-      G.player.pitch - dy * sensitivity * (settings.invert ? -1 : 1),
-      -0.62,
-      0.6,
-    );
-    G.player.centerTorso = false;
-    e.preventDefault();
-  });
-
-  const endAim = (e) => {
-    if (e.pointerId !== aimPointer) return;
-    aimPointer = null;
-  };
-  aim.addEventListener('pointerup', endAim);
-  aim.addEventListener('pointercancel', endAim);
-
-  // --- buttons --------------------------------------------------------------
   for (const button of $$('#touch .tbtn')) {
     const name = button.dataset.touch;
-
     button.addEventListener('pointerdown', (e) => {
+      if (
+        !running() ||
+        button.hasAttribute('disabled') ||
+        [...presses.values()].some((p) => p.element === button)
+      )
+        return;
+      if (['fire', 'jump', 'weapon'].includes(name) && !driving()) return;
+      presses.set(e.pointerId, { element: button, name });
       button.classList.add('held');
+      if (name === 'fire') beginAim(e);
       pressAction(name, button);
-      // Capture last: it can throw, and the press has already been honoured by here.
       capture(button, e.pointerId);
-      // Stop the press reaching the aim layer underneath.
-      e.stopPropagation();
       e.preventDefault();
     });
-
-    const release = (e) => {
-      button.classList.remove('held');
-      releaseAction(name);
-      e.stopPropagation();
-    };
-    button.addEventListener('pointerup', release);
-    button.addEventListener('pointercancel', release);
-    // A thumb that slides off a held button must not leave it stuck on.
-    button.addEventListener('lostpointercapture', () => {
-      button.classList.remove('held');
-      releaseAction(name);
+    // Keyboard / assistive activation of discrete buttons; touch was handled above.
+    button.addEventListener('click', (e) => {
+      if (e.detail === 0 && running() && !['fire', 'jump'].includes(name))
+        pressAction(name, button);
     });
+    button.addEventListener('lostpointercapture', endPointer);
   }
-
-  // Losing the tab with a finger down would otherwise leave the mech running.
+  window.addEventListener('pointermove', moveAim);
+  window.addEventListener('pointerup', endPointer);
+  window.addEventListener('pointercancel', endPointer);
+  stick.addEventListener('lostpointercapture', endPointer);
+  aim.addEventListener('lostpointercapture', endPointer);
+  window.addEventListener('blur', releaseAll);
+  // Rotation / browser chrome resizing invalidates every stored touch origin.
+  window.addEventListener('resize', releaseAll);
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) releaseAll();
   });
-  window.addEventListener('blur', releaseAll);
-
-  // The browser's own gestures — pull to refresh, double-tap zoom, text selection — all
-  // fight a game that wants raw drags. `touch-action: none` handles most of it; this
-  // catches the multi-touch pinch that it does not.
-  layer.addEventListener('gesturestart', (e) => e.preventDefault());
-  layer.addEventListener('contextmenu', (e) => e.preventDefault());
-
-  setTouchVisible(false);
+  $('touch').addEventListener('contextmenu', (e) => e.preventDefault());
 }

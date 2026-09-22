@@ -2,6 +2,9 @@
 
 The game loads audio from `assets/audio/`. Two directories, treated differently.
 
+`src/audio/sound-system.js` synthesises weapon, cockpit and engine effects and loads
+recorded voice lines. `src/audio/soundtrack.js` loads and crossfades mission music.
+
 ## `assets/audio/voice/` — committed
 
 40 short radio and cockpit lines (~0.6 MB), generated for this game. They ship with
@@ -54,6 +57,11 @@ pnpm run assets:check
 
 ## Regenerating from the original build
 
+The original HTML archive is not needed to run, build or test the current game. The
+source, extracted voice clips and recorded baseline are already in the repository.
+Keep an original copy only if you need to re-extract its assets or recapture its
+historical behaviour; current offline builds come from `pnpm build:single`.
+
 If you have the original 13 MB `RobotWarrior.html`, the extractor pulls every clip out
 of it and regenerates the manifest:
 
@@ -69,6 +77,14 @@ do not hand-edit it.
 `RobotWarrior.html` itself is gitignored for the same reason the music is: it carries
 those recordings inline.
 
+When changing voice clips, update the extractor and its source input, regenerate the
+manifest, and run `pnpm assets:check`. The check rejects both missing voice files and
+files with no manifest entry. A voice key is played with `sound.say(key)`.
+
+A new music cue also needs `title`, `duration` and `loop` metadata in `SOUNDTRACK_INFO`,
+plus a call from the soundtrack's preload or playback path. Adding a file alone does
+not schedule it to play.
+
 ## How loading works
 
 `src/data/audio-manifest.js` is the only place that knows which clips exist and what
@@ -83,3 +99,22 @@ sync.
 Note that a single-file bundle built on a machine that has the soundtrack present will
 have those recordings embedded in it. That bundle is for your own offline use. Do not
 redistribute it.
+
+## Diagnosing silence
+
+Run `pnpm assets:check` first: absent optional music is the most common explanation.
+The audio graph starts on a mission-start gesture. For headless checks, use the launch
+options in [playwright.config.js](../playwright.config.js).
+
+```js
+window.RobotWarrior.getStatus().audio;
+// cue, title, playing, position, duration, loop, loaded, failed
+```
+
+`loaded` and `failed` report soundtrack decoding. A failed music load logs at
+`console.info`; voice fetch or decode failures are swallowed so audio cannot stop the
+game. Inspect network requests when a voice line is silent.
+
+`initCoop()` wraps `tone`, `noise`, `say` and `fxPlay` to silence replayed or remote-owned
+frames. Any new sound entry point needs the same guard in `src/net/coop-bridge.js`, or
+reconciliation will replay its sound too.

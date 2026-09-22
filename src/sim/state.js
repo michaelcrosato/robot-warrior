@@ -53,6 +53,8 @@ export const G = {
   loadout: 'balanced',
   keys: {},
   mouse: { down: false, drag: false },
+  // Local input mode only; co-op transmits the resulting ordinary pilot inputs.
+  touchMode: false,
   weapons: [
     {
       name: 'DUAL PULSE',

@@ -25,7 +25,9 @@ export default defineConfig({
 
   use: {
     baseURL: 'http://127.0.0.1:4180',
-    trace: 'retain-on-failure',
+    // Recording every run adds GPU readbacks to an already busy SwiftShader runner.
+    // Capture CI failures on retry; local runs have no retry and retain their first trace.
+    trace: process.env.CI ? 'on-first-retry' : 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'off',
     launchOptions: { args: chromiumArgs },

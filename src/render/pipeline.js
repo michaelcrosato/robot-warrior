@@ -32,7 +32,6 @@ import {
   disposeTarget,
   disposeShadowArray,
   bindTarget,
-  hdrSupported,
 } from '../core/targets.js';
 import {
   SUN_DIR,
@@ -70,16 +69,6 @@ const current = {
   height: 0,
   tierId: '',
 };
-
-/** True once allocate() has run at least once. */
-export function ready() {
-  return !!current.scene;
-}
-
-/** The tier the current targets were built for. */
-export function allocatedTier() {
-  return current.tierId;
-}
 
 /**
  * (Re)allocate every target for a size and quality tier.
@@ -130,7 +119,7 @@ export function allocate(width, height, tier) {
 }
 
 /** Free every target. */
-export function release() {
+function release() {
   disposeTarget(current.scene);
   for (const t of current.bloomChain) disposeTarget(t);
   disposeTarget(current.ao);
@@ -173,7 +162,6 @@ function renderShadows(tier, drawOpaque) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, shadow.framebuffers[i]);
     gl.viewport(0, 0, shadow.size, shadow.size);
     gl.clear(gl.DEPTH_BUFFER_BIT);
-    pass.cascade = i;
     beginShadowPass(matrices[i]);
     drawOpaque();
     endShadowPass();
@@ -421,7 +409,7 @@ export function renderFrame(tier, scene) {
 
   // Without float targets the scene is already clamped, so a second exposure multiply
   // here would only crush it further.
-  gl.uniform1f(compositePrg.uExposure, hdrSupported ? 1.0 : 1.0);
+  gl.uniform1f(compositePrg.uExposure, 1);
   gl.uniform1f(compositePrg.uContrast, CONTRAST);
   gl.uniform1f(compositePrg.uSaturation, pass.imagingPass ? 1 : SATURATION);
   gl.uniform3fv(compositePrg.uTint, TINT);
