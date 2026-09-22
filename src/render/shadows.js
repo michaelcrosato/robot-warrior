@@ -142,8 +142,3 @@ export function updateCascades(camera, cascadeCount, shadowSize, maxDistance) {
 
   return { matrices, splits, texelWorld, count };
 }
-
-/** The split distances of the most recent update, for the scene shader. */
-export function cascadeSplits() {
-  return splits;
-}

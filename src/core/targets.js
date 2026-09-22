@@ -9,7 +9,7 @@
 import { gl, caps } from './gl.js';
 
 /** True when RGBA16F can actually be rendered into on this device. */
-export const hdrSupported = caps.colorBufferFloat;
+const hdrSupported = caps.colorBufferFloat;
 
 /** The colour format used for the scene and bloom targets. */
 const COLOR_INTERNAL = hdrSupported ? gl.RGBA16F : gl.RGBA8;
@@ -23,9 +23,6 @@ const COLOR_TYPE = hdrSupported ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE;
 const COLOR_FILTER = !hdrSupported || caps.floatLinear ? gl.LINEAR : gl.NEAREST;
 
 /** @typedef {{fb: WebGLFramebuffer, tex: WebGLTexture, depth: WebGLTexture|null, w: number, h: number}} Target */
-
-/** @type {Target[]} */
-const owned = [];
 
 /**
  * Create a colour target, optionally with a sampleable depth texture.
@@ -91,9 +88,7 @@ export function createTarget(w, h, options = {}) {
     throw Error(`framebuffer ${width}x${height} incomplete: 0x${status.toString(16)}`);
   }
 
-  const target = { fb, tex, depth, w: width, h: height };
-  owned.push(target);
-  return target;
+  return { fb, tex, depth, w: width, h: height };
 }
 
 /**
@@ -149,14 +144,12 @@ export function createShadowArray(size, layers) {
   return { tex, framebuffers, size, layers };
 }
 
-/** Release every target created here. Called before rebuilding at a new size. */
+/** Release one target. Called before rebuilding at a new size. */
 export function disposeTarget(target) {
   if (!target) return;
   gl.deleteFramebuffer(target.fb);
   gl.deleteTexture(target.tex);
   if (target.depth) gl.deleteTexture(target.depth);
-  const i = owned.indexOf(target);
-  if (i >= 0) owned.splice(i, 1);
 }
 
 export function disposeShadowArray(shadow) {

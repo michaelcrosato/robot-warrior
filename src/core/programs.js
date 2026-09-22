@@ -1,7 +1,7 @@
 /**
  * Shader compilation and the linked programs.
  *
- * Uniform and attribute locations are discovered by querying the linked program rather
+ * Uniform locations are discovered by querying the linked program rather
  * than being listed by hand. That matters with this many programs: a uniform the compiler
  * optimises away silently returns null from `getUniformLocation`, and a hand-written list
  * hides which ones actually survived.
@@ -49,14 +49,14 @@ function compile(type, source, label) {
 }
 
 /**
- * Link a program and return it with every active attribute and uniform resolved.
+ * Link a program and return it with every active uniform resolved.
  *
  * @param {string} label   used in error messages
  * @param {string} vs
  * @param {string} fs
  * @returns {{p: WebGLProgram, [key: string]: any}}
  */
-export function program(label, vs, fs) {
+function program(label, vs, fs) {
   const p = gl.createProgram();
   const v = compile(gl.VERTEX_SHADER, vs, label);
   const f = compile(gl.FRAGMENT_SHADER, fs, label);
@@ -76,12 +76,7 @@ export function program(label, vs, fs) {
     throw Error(`${label} program failed to link\n` + gl.getProgramInfoLog(p));
   }
 
-  const o = { p, label };
-  const attributeCount = gl.getProgramParameter(p, gl.ACTIVE_ATTRIBUTES);
-  for (let i = 0; i < attributeCount; i++) {
-    const info = gl.getActiveAttrib(p, i);
-    if (info) o[info.name] = gl.getAttribLocation(p, info.name);
-  }
+  const o = { p };
   const uniformCount = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
   for (let i = 0; i < uniformCount; i++) {
     const info = gl.getActiveUniform(p, i);
@@ -118,7 +113,7 @@ export const compositePrg = program('composite', FULLSCREEN_VS, COMPOSITE_FS);
  * `vUV` as a direction basis and an oversized triangle would extrapolate it past the
  * screen edges.
  */
-export const quadBuffer = gl.createBuffer();
+const quadBuffer = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
 gl.bufferData(
   gl.ARRAY_BUFFER,

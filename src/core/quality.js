@@ -18,12 +18,11 @@
  */
 import { caps } from './gl.js';
 import { settings } from './settings.js';
-import { classifyDevice, lowerTierId, TIER_ORDER } from './device.js';
+import { classifyDevice } from './device.js';
 
 /**
  * @typedef {object} Tier
  * @property {string}  id
- * @property {string}  label            shown in the settings menu
  * @property {number}  renderScale      multiplier on CSS pixels before the cap
  * @property {number}  maxWidth         hard cap on internal render width
  * @property {number}  shadowCascades   0 disables the shadow pass entirely
@@ -37,18 +36,13 @@ import { classifyDevice, lowerTierId, TIER_ORDER } from './device.js';
  * @property {number}  ssaoSamples
  * @property {number}  ssaoScale
  * @property {boolean} fxaa
- * @property {number}  anisotropy
  * @property {number}  entityDrawDistance
- * @property {boolean} softParticles
  */
 
-export { TIER_ORDER };
-
 /** @type {Record<string, Tier>} */
-export const TIERS = {
+const TIERS = {
   potato: {
     id: 'potato',
-    label: 'Minimum · no shadows',
     renderScale: 0.6,
     maxWidth: 960,
     shadowCascades: 0,
@@ -62,14 +56,11 @@ export const TIERS = {
     ssaoSamples: 0,
     ssaoScale: 0.5,
     fxaa: false,
-    anisotropy: 1,
     entityDrawDistance: 1200,
-    softParticles: false,
   },
 
   low: {
     id: 'low',
-    label: 'Low · 720p',
     renderScale: 0.75,
     maxWidth: 1280,
     shadowCascades: 1,
@@ -83,15 +74,12 @@ export const TIERS = {
     ssaoSamples: 0,
     ssaoScale: 0.5,
     fxaa: true,
-    anisotropy: 2,
     entityDrawDistance: 1400,
-    softParticles: false,
   },
 
   // Tuned against a Galaxy S26: sustained rather than peak, because phones throttle.
   mobile: {
     id: 'mobile',
-    label: 'Mobile · 1080p',
     renderScale: 1,
     maxWidth: 1920,
     shadowCascades: 2,
@@ -105,14 +93,11 @@ export const TIERS = {
     ssaoSamples: 0,
     ssaoScale: 0.5,
     fxaa: true,
-    anisotropy: 4,
     entityDrawDistance: 1700,
-    softParticles: true,
   },
 
   high: {
     id: 'high',
-    label: 'High · 1440p',
     renderScale: 1,
     maxWidth: 2560,
     shadowCascades: 3,
@@ -126,15 +111,12 @@ export const TIERS = {
     ssaoSamples: 12,
     ssaoScale: 0.5,
     fxaa: true,
-    anisotropy: 8,
     entityDrawDistance: 1700,
-    softParticles: true,
   },
 
   // Tuned against an RTX 4070 SUPER.
   ultra: {
     id: 'ultra',
-    label: 'Ultra · native',
     renderScale: 1,
     maxWidth: 3840,
     shadowCascades: 4,
@@ -148,9 +130,7 @@ export const TIERS = {
     ssaoSamples: 24,
     ssaoScale: 1,
     fxaa: true,
-    anisotropy: 16,
     entityDrawDistance: 2200,
-    softParticles: true,
   },
 };
 
@@ -161,7 +141,7 @@ export const TIERS = {
  * against real renderer strings without a browser — which is the only part of targeting a
  * specific phone or graphics card that is checkable from here.
  */
-export function detectTier() {
+function detectTier() {
   return classifyDevice({
     renderer: caps.renderer,
     coarsePointer: caps.coarsePointer,
@@ -170,22 +150,15 @@ export function detectTier() {
   });
 }
 
-/** The tier one step cheaper, or null at the bottom. */
-export function lowerTier(id) {
-  const next = lowerTierId(id);
-  return next ? TIERS[next] : null;
-}
-
 /**
  * The tier currently in force.
  *
  * `quality` in settings is either a tier id or 'auto'. Resolving it here keeps the
- * auto-detection in one place, so a device moved between tiers by the frame-rate governor
- * still reports honestly in the settings menu.
+ * auto-detection in one place.
  *
  * @param {string} setting
  */
-export function resolveTier(setting) {
+function resolveTier(setting) {
   // 'auto' is not a tier id, so it falls through to detection — as does any stale value
   // saved by an older build.
   if (setting && TIERS[setting]) return TIERS[setting];
@@ -207,12 +180,7 @@ export function activeTier() {
 }
 
 /**
- * Force a tier, or pass nothing to re-resolve from settings.
- *
- * The frame-rate governor uses this to step down on a device that cannot hold its budget,
- * without writing the change into saved settings — a phone that throttles in a long
- * mission should not be permanently demoted the next time it is opened cool.
- *
+ * Apply a selected tier, or re-resolve from settings when no valid id is supplied.
  * @param {string} [id]
  */
 export function setActiveTier(id) {
