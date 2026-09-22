@@ -57,6 +57,11 @@ pnpm run assets:check
 
 ## Regenerating from the original build
 
+The original HTML archive is not needed to run, build or test the current game. The
+source, extracted voice clips and recorded baseline are already in the repository.
+Keep an original copy only if you need to re-extract its assets or recapture its
+historical behaviour; current offline builds come from `pnpm build:single`.
+
 If you have the original 13 MB `RobotWarrior.html`, the extractor pulls every clip out
 of it and regenerates the manifest:
 
