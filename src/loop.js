@@ -3,7 +3,7 @@
  */
 import { $ } from './core/dom.js';
 import { G } from './sim/state.js';
-import { updateTouchVisibility } from './ui/touch.js';
+import { updateTouch } from './ui/touch.js';
 import { announce, drawHUD } from './net/coop-bridge.js';
 import { renderWorld } from './render/world.js';
 import { sound } from './audio/sound-system.js';
@@ -24,7 +24,7 @@ export function frame(now) {
   G.realTime += dt;
   // The touch layer belongs to a running mission, so its visibility follows game state
   // rather than being toggled at every transition that could reach it.
-  updateTouchVisibility();
+  updateTouch(dt);
   fpsClock += dt;
   frameCount++;
   if (fpsClock > 1) {

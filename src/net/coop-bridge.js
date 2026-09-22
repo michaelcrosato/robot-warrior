@@ -298,43 +298,53 @@ function drawCoopHUD() {
     x = w * 0.73,
     y = h * 0.2,
     bw = w * 0.18;
-  rect(x - 8 * s, y - 11 * s, bw + 16 * s, 26 * s + rows.length * 21 * s, '#0a1818b8', '#647d7255');
-  txt(
-    'LANCE / ' + rows.length + ' PILOTS' + (G.coop.host ? ' / HOST' : ''),
-    x,
-    y + 2 * s,
-    8,
-    '#80d6df',
-  );
-  rows.forEach((r, i) => {
-    const p = G.coop.playerOf(r);
-    if (!p) return;
-    const yy = y + 23 * s + i * 21 * s,
-      c = COOP_COLORS[r.slot];
-    let total = 0,
-      max = 0;
-    for (const q of Object.values(p.components)) {
-      total += Math.max(0, q.hp);
-      max += q.max;
-    }
-    txt(r.slot + 1 + ' ' + r.name.slice(0, 12) + (r.id === G.coop.id ? ' *' : ''), x, yy, 9, c);
-    const status = p.alive
-      ? Math.round((total / max) * 100) + '%'
-      : r.revive > 0
-        ? 'RESTORE ' + Math.floor((r.revive / 6) * 100) + '%'
-        : 'DOWN';
-    txt(status, x + bw, yy, 8, p.alive ? c : '#f49473', 'right');
-  });
-  const l = G.coop.guest ? G.coop.transport?.links.get(G.coop.hostId) : null;
-  txt(
-    G.coop.guest
-      ? (l?.route || 'LINK') + ' / ' + Math.round(l?.rtt || 0) + ' MS'
-      : G.coop.formattedRoom() + ' / FRIENDLY FIRE OFF',
-    x,
-    y + 22 * s + rows.length * 21 * s,
-    7,
-    '#8dab9a',
-  );
+  // Mobile keeps the roster in SYS; this desktop panel would cover the phone's sight.
+  if (!G.touchMode) {
+    rect(
+      x - 8 * s,
+      y - 11 * s,
+      bw + 16 * s,
+      26 * s + rows.length * 21 * s,
+      '#0a1818b8',
+      '#647d7255',
+    );
+    txt(
+      'LANCE / ' + rows.length + ' PILOTS' + (G.coop.host ? ' / HOST' : ''),
+      x,
+      y + 2 * s,
+      8,
+      '#80d6df',
+    );
+    rows.forEach((r, i) => {
+      const p = G.coop.playerOf(r);
+      if (!p) return;
+      const yy = y + 23 * s + i * 21 * s,
+        c = COOP_COLORS[r.slot];
+      let total = 0,
+        max = 0;
+      for (const q of Object.values(p.components)) {
+        total += Math.max(0, q.hp);
+        max += q.max;
+      }
+      txt(r.slot + 1 + ' ' + r.name.slice(0, 12) + (r.id === G.coop.id ? ' *' : ''), x, yy, 9, c);
+      const status = p.alive
+        ? Math.round((total / max) * 100) + '%'
+        : r.revive > 0
+          ? 'RESTORE ' + Math.floor((r.revive / 6) * 100) + '%'
+          : 'DOWN';
+      txt(status, x + bw, yy, 8, p.alive ? c : '#f49473', 'right');
+    });
+    const l = G.coop.guest ? G.coop.transport?.links.get(G.coop.hostId) : null;
+    txt(
+      G.coop.guest
+        ? (l?.route || 'LINK') + ' / ' + Math.round(l?.rtt || 0) + ' MS'
+        : G.coop.formattedRoom() + ' / FRIENDLY FIRE OFF',
+      x,
+      y + 22 * s + rows.length * 21 * s,
+      7,
+      '#8dab9a',
+    );
+  }
   for (const r of rows) {
     if (r.id === G.coop.id) continue;
     const p = G.coop.host ? r.sim?.p : r.view || r.p;
@@ -380,7 +390,14 @@ function drawCoopHUD() {
     }
     if (!p.alive && d < 38 && G.player.alive) {
       rect(w * 0.5 - 175 * s, h * 0.495, 350 * s, 36 * s, '#0b1d1fe8', c);
-      txt('STOP + HOLD [J] / RESTORE ' + r.name, w * 0.5, h * 0.495 + 14 * s, 10, c, 'center');
+      txt(
+        (G.touchMode ? 'STOP TO RESTORE / ' : 'STOP + HOLD [J] / RESTORE ') + r.name,
+        w * 0.5,
+        h * 0.495 + 14 * s,
+        G.touchMode ? 15 : 10,
+        c,
+        'center',
+      );
       rect(
         w * 0.5 - 170 * s,
         h * 0.495 + 29 * s,

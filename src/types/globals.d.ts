@@ -104,6 +104,22 @@ declare global {
       readonly version: string;
       getStatus(): GameStatus;
       getCoopStatus(): Record<string, unknown>;
+      getControlStatus(): {
+        touch: boolean;
+        throttle: number;
+        yaw: number;
+        fire: boolean;
+        jets: boolean;
+        turning: boolean;
+        aligning: boolean;
+        weapon: number;
+        target: string | null;
+        lock: number;
+        cooling: boolean;
+        shots: number;
+        fuel: number;
+        coolants: number;
+      };
       /**
        * Non-finite-value scan of every render target, for diagnostics and tests.
        *

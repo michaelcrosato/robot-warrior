@@ -10,6 +10,7 @@ import { sound } from '../audio/sound-system.js';
 import { terrainY } from '../world/terrain.js';
 import { toast } from '../net/coop-bridge.js';
 import { world } from '../core/gl.js';
+import { inputHint } from '../core/input-hints.js';
 
 export function applyChassisWeapons() {
   chassisData().weapons.forEach((w, i) => Object.assign(G.weapons[i], w, { remaining: 0 }));
@@ -78,7 +79,7 @@ export function soloAnnounce(text, voice = null, duration = 7) {
 }
 
 export function soloToast(text, seconds = 3) {
-  $('toast').textContent = text;
+  $('toast').textContent = inputHint(text, G.touchMode);
   $('toast').hidden = false;
   G.toastTimer = seconds;
 }
@@ -128,6 +129,7 @@ export function resetGame() {
 }
 
 export function requestCapture() {
+  if (G.touchMode) return;
   try {
     const p = world.requestPointerLock?.();
     if (p && p.catch)

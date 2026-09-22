@@ -824,61 +824,7 @@ export function drawFlightHUD() {
     9,
     hudDim,
   );
-  const objs =
-    G.missionStage === 'basin'
-      ? [
-          ['RELAY', G.missionFlags[0]],
-          ['UPLINK', G.missionFlags[1]],
-          ['BASIN GUARDS ' + basinThreats().length, G.missionFlags[2]],
-        ]
-      : G.missionStage === 'transit'
-        ? [
-            ['BASIN SECURED', true],
-            ['CROSS NEEDLE PASS', G.missionFlags[3]],
-            ['REPAIR BAY / OPTIONAL', G.serviceUsed],
-          ]
-        : G.missionStage === 'works'
-          ? [
-              ['WEST POWER FEED', !structures.westFeed.alive],
-              ['EAST POWER FEED', !structures.eastFeed.alive],
-              [
-                reactorShielded() ? 'REACTOR SHIELDED' : 'REACTOR EXPOSED',
-                !structures.reactor.alive,
-              ],
-            ]
-          : G.missionStage === 'ridgeTransit'
-            ? [
-                ['ASHFALL REACTOR DOWN', true],
-                ['CROSS CINDER CUT / GOLF', G.missionFlags[5]],
-                ['RIDGE BAY / OPTIONAL', G.supplyUsed],
-              ]
-            : G.missionStage === 'ridge'
-              ? [
-                  ['CINDER CUT CROSSED', true],
-                  ['SKYGUARD / NAV HOTEL', G.missionFlags[6]],
-                  ['FLIGHT CODES / LOCKED', false],
-                ]
-              : G.missionStage === 'link'
-                ? [
-                    ['SKYGUARD DESTROYED', true],
-                    [
-                      'FLIGHT CODES ' + Math.floor((G.linkTime / flightLink.duration) * 100) + '%',
-                      G.linkTime >= flightLink.duration,
-                    ],
-                    [
-                      'RESPONSE ' +
-                        ridgeResponseThreats().length +
-                        ' / WAVE ' +
-                        G.linkWave +
-                        ' OF 2',
-                      G.linkWave === 2 && ridgeResponseThreats().length === 0,
-                    ],
-                  ]
-                : [
-                    ['FLIGHT CODES SECURED', true],
-                    ['NAV JULIET / EXTRACT', G.extractTime >= 5],
-                    ['LANDING ZONE CLEAR', landingThreats().length === 0],
-                  ];
+  const objs = missionObjectives();
   for (let i = 0; i < objs.length; i++)
     txt(
       (objs[i][1] ? '[×] ' : '[ ] ') + objs[i][0],
@@ -1025,4 +971,55 @@ export function drawFlightHUD() {
       hudColor,
       'center',
     );
+}
+
+/** Shared objective wording for the cockpit and readable mobile HUD. */
+export function missionObjectives() {
+  return G.missionStage === 'basin'
+    ? [
+        ['RELAY', G.missionFlags[0]],
+        ['UPLINK', G.missionFlags[1]],
+        ['BASIN GUARDS ' + basinThreats().length, G.missionFlags[2]],
+      ]
+    : G.missionStage === 'transit'
+      ? [
+          ['BASIN SECURED', true],
+          ['CROSS NEEDLE PASS', G.missionFlags[3]],
+          ['REPAIR BAY / OPTIONAL', G.serviceUsed],
+        ]
+      : G.missionStage === 'works'
+        ? [
+            ['WEST POWER FEED', !structures.westFeed.alive],
+            ['EAST POWER FEED', !structures.eastFeed.alive],
+            [reactorShielded() ? 'REACTOR SHIELDED' : 'REACTOR EXPOSED', !structures.reactor.alive],
+          ]
+        : G.missionStage === 'ridgeTransit'
+          ? [
+              ['ASHFALL REACTOR DOWN', true],
+              ['CROSS CINDER CUT / GOLF', G.missionFlags[5]],
+              ['RIDGE BAY / OPTIONAL', G.supplyUsed],
+            ]
+          : G.missionStage === 'ridge'
+            ? [
+                ['CINDER CUT CROSSED', true],
+                ['SKYGUARD / NAV HOTEL', G.missionFlags[6]],
+                ['FLIGHT CODES / LOCKED', false],
+              ]
+            : G.missionStage === 'link'
+              ? [
+                  ['SKYGUARD DESTROYED', true],
+                  [
+                    'FLIGHT CODES ' + Math.floor((G.linkTime / flightLink.duration) * 100) + '%',
+                    G.linkTime >= flightLink.duration,
+                  ],
+                  [
+                    'RESPONSE ' + ridgeResponseThreats().length + ' / WAVE ' + G.linkWave + ' OF 2',
+                    G.linkWave === 2 && ridgeResponseThreats().length === 0,
+                  ],
+                ]
+              : [
+                  ['FLIGHT CODES SECURED', true],
+                  ['NAV JULIET / EXTRACT', G.extractTime >= 5],
+                  ['LANDING ZONE CLEAR', landingThreats().length === 0],
+                ];
 }

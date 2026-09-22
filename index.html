@@ -41,41 +41,104 @@
     <canvas id="hud" aria-hidden="true"></canvas>
     <div id="touch" hidden aria-hidden="true">
       <div id="touchAim" aria-label="Drag to aim"></div>
-
-      <div id="touchStick">
-        <div class="stick-ring"><div class="stick-knob" id="stickKnob"></div></div>
-        <div class="stick-label">THROTTLE / TURN</div>
-        <div class="stick-readout" id="stickReadout">0%</div>
+      <div id="touchHeader">
+        <div id="touchTelemetry" aria-label="Mech status">
+          <div><span>ARMOR</span><b id="touchArmor">100%</b></div>
+          <div><span>HEAT</span><b id="touchHeat">0%</b></div>
+          <div><span>FUEL</span><b id="touchFuel">100%</b></div>
+        </div>
+        <div id="touchTop">
+          <button
+            class="tbtn"
+            data-touch="map"
+            aria-label="Tactical map"
+            aria-expanded="false"
+            aria-controls="touchMapPanel"
+          >
+            MAP
+          </button>
+          <button
+            class="tbtn"
+            data-touch="systems"
+            aria-label="Systems"
+            aria-expanded="false"
+            aria-controls="touchTools"
+          >
+            SYS
+          </button>
+          <button class="tbtn" data-touch="pause" aria-label="Pause">Ⅱ</button>
+        </div>
+        <div id="touchMission"><b id="touchObjective"></b><span id="touchNav"></span></div>
+        <div id="touchRadio" aria-live="polite"></div>
       </div>
-
-      <div id="touchLeftPad">
-        <button class="tbtn small" data-touch="stop" aria-label="Stop">STOP</button>
-        <button class="tbtn small" data-touch="align" aria-label="Align legs with torso">
-          ALIGN
-        </button>
-        <button class="tbtn small" data-touch="center" aria-label="Centre torso">CENTRE</button>
+      <div id="touchControls">
+        <div id="touchStick" aria-label="Move and turn; release to stop">
+          <div class="stick-ring"><div class="stick-knob" id="stickKnob"></div></div>
+          <div class="stick-label">MOVE / TURN</div>
+          <div class="stick-readout" id="stickReadout">RELEASE TO STOP</div>
+        </div>
+        <div id="touchPad">
+          <button class="tbtn" data-touch="jump" aria-label="Hold for jump jets">JETS</button>
+          <button class="tbtn fire" data-touch="fire" aria-label="Hold to fire and drag to aim">
+            <b>FIRE</b><span>DRAG TO AIM</span>
+          </button>
+        </div>
+        <div id="touchWeapons" role="group" aria-label="Weapon select">
+          <button
+            class="tbtn weapon"
+            data-touch="weapon"
+            data-index="0"
+            aria-label="Select pulse lasers"
+          >
+            <b>PULSE</b><span>READY</span>
+          </button>
+          <button class="tbtn weapon" data-touch="weapon" data-index="1" aria-label="Select cannon">
+            <b>CANNON</b><span>60</span>
+          </button>
+          <button
+            class="tbtn weapon"
+            data-touch="weapon"
+            data-index="2"
+            aria-label="Select missiles"
+          >
+            <b>MISSILE</b><span>40</span>
+          </button>
+        </div>
+        <div id="touchAssist">AUTO TARGET · AUTO ALIGN · HEAT GUARD</div>
       </div>
-
-      <div id="touchPad">
-        <button class="tbtn hold" data-touch="jump" aria-label="Jump jets">JETS</button>
-        <button class="tbtn fire" data-touch="fire" aria-label="Fire">FIRE</button>
-        <button class="tbtn" data-touch="target" aria-label="Next target">TGT</button>
-        <button class="tbtn" data-touch="coolant" aria-label="Coolant flush">COOL</button>
-      </div>
-
-      <div id="touchWeapons" role="group" aria-label="Weapon select">
-        <button class="tbtn weapon" data-touch="weapon" data-index="0">1</button>
-        <button class="tbtn weapon" data-touch="weapon" data-index="1">2</button>
-        <button class="tbtn weapon" data-touch="weapon" data-index="2">3</button>
-      </div>
-
-      <div id="touchTop">
-        <button class="tbtn tiny" data-touch="pause" aria-label="Pause">❚❚</button>
-        <button class="tbtn tiny" data-touch="imaging" aria-label="Enhanced Imaging">EI</button>
-        <button class="tbtn tiny" data-touch="zoom" aria-label="Zoom">ZOOM</button>
-        <button class="tbtn tiny" data-touch="map" aria-label="Tactical map">MAP</button>
-        <button class="tbtn tiny" data-touch="nav" aria-label="Next waypoint">NAV</button>
-      </div>
+      <section id="touchTools" class="touch-panel" aria-label="Mech systems" hidden>
+        <p id="touchSquad"></p>
+        <div class="touch-panel-title">
+          <b>MECH SYSTEMS</b
+          ><button class="tbtn" data-touch="systems" aria-label="Close systems">CLOSE</button>
+        </div>
+        <p>
+          Move with the left thumb. Hold FIRE and drag with the right thumb, or drag the view to
+          look without firing. Release the stick to stop.
+        </p>
+        <div class="touch-tool-grid">
+          <button class="tbtn" data-touch="zoom" aria-pressed="false">ZOOM</button>
+          <button class="tbtn" data-touch="imaging" aria-pressed="false">IMAGING</button>
+          <button class="tbtn" data-touch="vision" aria-pressed="false">NIGHT</button>
+          <button class="tbtn" data-touch="coolant">COOLANT</button>
+          <button class="tbtn" data-touch="nav">WAYPOINT</button>
+          <button class="tbtn" data-touch="help">MANUAL</button>
+        </div>
+        <p>
+          Targets near the sight are selected automatically. Moving straight aligns the legs to your
+          aim. Fire pauses to prevent overheating; coolant is manual.
+        </p>
+      </section>
+      <section id="touchMapPanel" class="touch-panel" aria-label="Tactical map" hidden>
+        <div class="touch-panel-title">
+          <b>TACTICAL MAP</b
+          ><button class="tbtn" data-touch="map" aria-label="Close map">CLOSE</button>
+        </div>
+        <canvas id="touchMap" aria-label="Mission route, hostiles and repair bays"></canvas>
+        <span>NORTH ↑ · GRID 200 M · MISSION REMAINS LIVE</span>
+      </section>
+      <div id="touchTarget"></div>
+      <div id="touchNotice"></div>
     </div>
     <div id="vignette"></div>
     <div id="grain"></div>
@@ -124,7 +187,7 @@
         <div class="menu-hint" id="inputHint">
           KEYBOARD + MOUSE &nbsp; / &nbsp; HEADPHONES RECOMMENDED
         </div>
-        <div id="touchWarn">Turn your device sideways for the full cockpit.</div>
+        <div id="touchWarn">Play upright or sideways. Hold FIRE and drag to aim.</div>
       </main>
       <div class="hero-tag">
         <strong id="heroCode">WRD—70</strong><span id="heroClass">WARDEN / HEAVY CLASS</span>
@@ -285,9 +348,17 @@
         </header>
         <div class="panel-body">
           <h2>KNOW YOUR MACHINE.</h2>
+          <p class="touch-help">
+            TOUCH / Drag the left stick to move and turn; release it to stop. Hold FIRE and drag to
+            aim with your other thumb. Drag the view to look without firing. Tap a weapon to select
+            it, and hold JETS to jump. Targets near the sight select automatically; moving straight
+            aligns your legs. Heat guard pauses sustained fire to cool the reactor. MAP shows the
+            route. SYS holds zoom, imaging, night vision, coolant and waypoints. Stop near a downed
+            co-op teammate to restore them automatically.
+          </p>
           <p>
             This is a walking tank, not a foot soldier. Set the throttle, turn the legs, then aim
-            the torso. Your speed stays set when you release the key.
+            the torso. With keyboard controls, your speed stays set when you release the key.
           </p>
           <div class="manual-grid">
             <div class="control">

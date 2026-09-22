@@ -100,7 +100,10 @@ containment layer, and `tests/e2e/render.spec.js` checks every stage during comb
 Keyboard and mouse in `src/ui/input.js`, touch in `src/ui/touch.js`. Both write to the same
 state — `G.keys`, `G.mouse`, `G.player.torso` — so the simulation cannot tell which is in
 use and a new control is wired once. Touch controls show only on a coarse primary pointer
-and only during a mission; see [ADR 0007](adr/0007-touch-controls.md).
+and only during a mission. Mobile assists run in `updateTouch()` before solo simulation or
+co-op sampling, never inside replayed pilot steps. The mobile HUD uses DOM telemetry and a
+canvas sight instead of shrinking the desktop instruments. See
+[ADR 0008](adr/0008-two-thumb-mobile-cockpit.md) for the controls, assists and verification.
 
 ## Nothing is loaded — everything is generated
 
