@@ -13,11 +13,22 @@
  */
 const MODES = { off: 0, shadow: 1, cascade: 2, normal: 3, albedo: 4, roughness: 5 };
 
+/**
+ * The debug mode a query string asks for, or 0 when it asks for none or for a name that
+ * is not a mode. Own keys only: `?debug=constructor` would otherwise resolve to the
+ * lookup object's inherited constructor.
+ *
+ * @param {string} search  a URL query string, e.g. `location.search`
+ */
+export function parseDebugMode(search) {
+  const requested = new URLSearchParams(search).get('debug');
+  return requested && Object.hasOwn(MODES, requested) ? MODES[requested] : 0;
+}
+
 /** The mode requested for this session. Read once; changing it needs a reload. */
 export const debugMode = (() => {
   try {
-    const requested = new URLSearchParams(location.search).get('debug');
-    return MODES[requested ?? 'off'] ?? 0;
+    return parseDebugMode(location.search);
   } catch {
     return 0;
   }

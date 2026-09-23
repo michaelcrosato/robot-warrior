@@ -25,6 +25,7 @@ class SoundSystem {
       this.active = true;
       return;
     }
+    let built = false;
     try {
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
       const c = this.ctx;
@@ -59,6 +60,7 @@ class SoundSystem {
         a = b.getChannelData(0);
       for (let i = 0; i < a.length; i++) a[i] = Math.random() * 2 - 1;
       this.noiseBuffer = b;
+      built = true;
       this.active = true;
       for (const clip of VOICE_CLIPS)
         fetch(voiceUrl(clip))
@@ -69,6 +71,14 @@ class SoundSystem {
       await c.resume();
     } catch (e) {
       this.active = false;
+      // A half-built graph is worse than none. The early return above would mark it active
+      // on the next deploy, and update() would then reach for the parts that were never
+      // made — every frame. Close it so the next attempt starts from nothing.
+      if (!built && this.ctx) {
+        this.ctx.close().catch(() => {});
+        this.ctx = null;
+        this.soundtrack = null;
+      }
       console.warn('Audio unavailable:', e.message);
     }
   }
