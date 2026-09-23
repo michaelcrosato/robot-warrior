@@ -92,3 +92,20 @@ test('Enter deploys from the bare menu only, never through a focused control', a
   await page.keyboard.press('Enter');
   await expect.poll(state).not.toBe('menu');
 });
+
+test.describe('an operating system that asks for reduced motion', () => {
+  test.use({ reducedMotion: 'reduce' });
+
+  test('starts with cockpit motion off, and a stored choice still wins', async ({ page }) => {
+    await page.goto('/');
+    await waitForBoot(page);
+    expect(await page.locator('#shake').isChecked()).toBe(false);
+
+    await page.evaluate(() =>
+      localStorage.setItem('robotwarrior.settings', JSON.stringify({ shake: true })),
+    );
+    await page.reload();
+    await waitForBoot(page);
+    expect(await page.locator('#shake').isChecked()).toBe(true);
+  });
+});

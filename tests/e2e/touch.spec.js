@@ -347,7 +347,9 @@ for (const orientation of orientations) {
   });
 }
 
-test('desktop retains its cockpit and keyboard throttle', async ({ page }) => {
+test('desktop retains its cockpit, keyboard throttle and wheel weapon cycling', async ({
+  page,
+}) => {
   await page.goto('/');
   await waitForBoot(page);
   await page.locator('#startBtn').click();
@@ -360,6 +362,22 @@ test('desktop retains its cockpit and keyboard throttle', async ({ page }) => {
   await expect.poll(async () => (await controls(page)).throttle).toBe(1);
   await page.keyboard.press('KeyX');
   await expect.poll(async () => (await controls(page)).throttle).toBe(0);
+
+  // The wheel listens on the world canvas, so the pointer has to be over it.
+  const view = page.viewportSize();
+  await page.mouse.move(view.width / 2, view.height / 2);
+  const weapon = async () => (await controls(page)).weapon;
+  const start = await weapon();
+  await page.mouse.wheel(0, 100);
+  await expect.poll(weapon).toBe((start + 1) % 3);
+  // A sideways swipe is not "previous weapon", and a burst of momentum inside one repeat
+  // window is one step, not a spin through all three.
+  await page.waitForTimeout(200);
+  await page.mouse.wheel(90, 0);
+  for (let i = 0; i < 4; i++) await page.mouse.wheel(0, 40);
+  await expect.poll(weapon).toBe((start + 2) % 3);
+  await page.waitForTimeout(300);
+  expect(await weapon()).toBe((start + 2) % 3);
 });
 
 test.describe('compact phones and safe areas', () => {

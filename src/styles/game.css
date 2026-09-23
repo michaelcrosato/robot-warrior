@@ -595,11 +595,15 @@ kbd {
   font-size: 9px;
   padding: 9px 12px;
 }
-.no-motion *,
-.no-motion *:before,
-.no-motion *:after {
-  animation: none !important;
-  transition: none !important;
+/* Honour the operating system's reduced-motion request for the interface's own animations
+   and transitions. This rule used to hang off a .no-motion class nothing ever applied. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *:before,
+  *:after {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 @media (max-width: 900px) {
   #menu {

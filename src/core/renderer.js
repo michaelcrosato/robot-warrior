@@ -98,7 +98,9 @@ function edgeBuffer(g) {
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(out), gl.STATIC_DRAW);
   currentVao = null;
   gl.bindVertexArray(null);
-  g.edges = { b, count: out.length / 9, data: out };
+  // Only the GPU buffer is kept. Holding `out` as well kept the edge list alive in the JS
+  // heap after upload — over a million numbers for the ground mesh alone — for nothing.
+  g.edges = { b, count: out.length / 9 };
   return g.edges;
 }
 

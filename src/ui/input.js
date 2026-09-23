@@ -1,6 +1,7 @@
 /**
  * Keyboard, mouse, pointer lock and context-loss handling.
  */
+import { wheelStep } from './wheel.js';
 import { $ } from '../core/dom.js';
 import { G } from '../sim/state.js';
 import { chooseTarget } from '../sim/combat.js';
@@ -183,10 +184,12 @@ export function initInput() {
   world.addEventListener(
     'wheel',
     (e) => {
-      if (G.state === 'playing') {
-        G.weaponIndex = (G.weaponIndex + (e.deltaY > 0 ? 1 : 2)) % 3;
-        e.preventDefault();
-      }
+      if (G.state !== 'playing') return;
+      e.preventDefault();
+      const step = wheelStep(e.deltaX, e.deltaY, performance.now(), lastWheel);
+      if (!step) return;
+      lastWheel = performance.now();
+      G.weaponIndex = (G.weaponIndex + (step > 0 ? 1 : 2)) % 3;
     },
     { passive: false },
   );
@@ -214,3 +217,6 @@ export function initInput() {
 }
 
 let hadLock = false;
+
+/** When the wheel last changed weapon; see wheelStep(). */
+let lastWheel = -Infinity;
