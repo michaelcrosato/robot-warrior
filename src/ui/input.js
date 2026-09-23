@@ -56,7 +56,12 @@ export function initInput() {
       return;
     }
     if (G.state === 'menu') {
-      if (e.code === 'Enter' && !e.repeat && $('manual').hidden) startMission();
+      // Enter is a quick deploy from the bare menu only. A focused control handles Enter
+      // itself, and an open briefing or co-op lobby means the player is somewhere else:
+      // deploying from there started a solo mission underneath it.
+      const focused = document.activeElement?.closest?.('button, a, [role="button"]');
+      const covered = !$('manual').hidden || !$('brief').hidden || !$('coopLobby').hidden;
+      if (e.code === 'Enter' && !e.repeat && !focused && !covered) startMission();
       return;
     }
     if (G.state !== 'playing' && G.state !== 'boot') return;
@@ -204,8 +209,7 @@ export function initInput() {
     e.preventDefault();
     pauseGame();
     $('error').className = 'on';
-    $('error').innerHTML =
-      'The graphics context was lost.<br>Reload this file to restart the game.';
+    $('error').textContent = 'The graphics context was lost. Reload the page to restart the game.';
   });
 }
 
