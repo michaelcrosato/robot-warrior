@@ -22,7 +22,7 @@
   "bugs": "https://github.com/michaelcrosato/robot-warrior/issues",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": "^22.13.0 || ^24.0.0 || >=26.0.0"
   },
   "packageManager": "pnpm@12.3.4",
   "scripts": {
@@ -40,7 +40,6 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "pnpm run build && playwright test",
-    "test:e2e:update": "pnpm run build && playwright test --update-snapshots",
     "verify": "pnpm run assets:check && pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build && pnpm run test:e2e",
     "baseline": "node scripts/capture-baseline.mjs",
     "build:single": "pnpm run build && node scripts/bundle-single.mjs"

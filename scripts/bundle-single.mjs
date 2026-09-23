@@ -44,7 +44,10 @@ function inline(pattern, build, label) {
     console.error(`${label} references ${match[1]}, which is not in dist/.`);
     process.exit(1);
   }
-  html = html.replace(match[0], build(fs.readFileSync(file, 'utf8')));
+  // A replacer function, not a string: a string replacement expands $&, $', $` and $$, and
+  // a minified bundle can contain any of them. The output would have been silently wrong.
+  const content = build(fs.readFileSync(file, 'utf8'));
+  html = html.replace(match[0], () => content);
   return fs.statSync(file).size;
 }
 

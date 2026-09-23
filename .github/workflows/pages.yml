@@ -1,14 +1,21 @@
 name: Deploy to Pages
 
+# Publish only what CI has verified. This used to run on every push to main, in parallel
+# with CI, so a commit shipped whether or not its tests passed — #9 was live while its CI
+# run was still failing. It now runs when CI finishes on main, and deploys that exact
+# commit only if CI passed. A newer push cancels an older CI run (ci.yml concurrency), so
+# a cancelled run deploys nothing and the newer one deploys in its place.
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
+# Read-only by default. The deploy job alone gets the Pages and OIDC grants, so the build
+# job, which runs pnpm install and the whole Vite toolchain, never holds them.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 # One deployment at a time, and never cancel one midway — a cancelled deploy can
 # leave the site on a half-published version.
@@ -21,13 +28,23 @@ jobs:
     name: build
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # `branches: [main]` above matches the triggering run's branch *name*, which a pull
+    # request from a fork can also call main. Deploy only a push to this repository's main.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          # The commit CI verified, not whatever main points at by the time this runs.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -52,9 +69,9 @@ jobs:
           echo "music clips: $(ls dist/audio/music 2>/dev/null | wc -l) (0 is expected)" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
 
-      - uses: actions/upload-pages-artifact@v5
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
           path: dist
 
@@ -63,6 +80,9 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
 
     environment:
       name: github-pages
@@ -70,4 +90,4 @@ jobs:
 
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5

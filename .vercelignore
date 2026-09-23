@@ -1,0 +1,7 @@
+# Never upload the soundtrack. It is third-party copyrighted audio, gitignored for that
+# reason (docs/adr/0003-keep-the-soundtrack-out-of-the-repo.md), and Vite copies
+# everything under assets/ into the build, so a `vercel deploy` from a working tree that
+# has it would publish it. Git-triggered deploys never see it; this covers CLI uploads.
+assets/audio/music/
+RobotWarrior.html
+dist-single/
