@@ -1,13 +1,25 @@
 /**
  * Persisted player settings.
  */
+/**
+ * Whether the operating system asks for reduced motion. Screen shake defaults to off when
+ * it does; a player who wants it anyway can still turn it on, and that choice is stored.
+ */
+const reducedMotion = (() => {
+  try {
+    return matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch (e) {
+    return false;
+  }
+})();
+
 export const settings = {
   volume: 0.7,
   music: 0.35,
   sensitivity: 0.6,
   // 'auto' resolves per device — see src/core/quality.js. Anything else names a tier.
   quality: 'auto',
-  shake: true,
+  shake: !reducedMotion,
   invert: false,
 };
 
