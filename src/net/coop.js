@@ -1151,7 +1151,7 @@ export class LanceCoop {
       if (this.playerOf(r).alive) this.withPilot(r, () => updateRepairBays(dt));
   }
   projectileHit(p, dir, len) {
-    const cover = coverDistance(p.p, dir, len);
+    const cover = coverDistance(p.p, dir, len, true);
     let hit = null,
       near = Math.min(len + 1, cover);
     for (const r of this.living()) {
@@ -1168,7 +1168,7 @@ export class LanceCoop {
       this.withPilot(hit, () => damagePlayer(p.damage, p));
       return;
     }
-    if (cover < len - 0.5) {
+    if (cover < len) {
       p.hit = true;
       burst(vadd(p.p, vmul(dir, cover)), p.color, 7, 4);
     }

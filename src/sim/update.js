@@ -20,8 +20,9 @@ import { capacities } from './player.js';
 import { chassisData } from '../data/chassis.js';
 import { clamp, dist2, dot, hex, mix, norm, vadd, vmul, vsub, wrap } from '../core/math.js';
 import { enemyModels } from '../entities/models.js';
-import { makeMech } from '../entities/spawn.js';
-import { moveActor } from './movement.js';
+import { makeMech, ridgeGateLocked } from '../entities/spawn.js';
+import { ridgeGate } from '../world/sites.js';
+import { moveActor, structureHeight, structureRadius } from './movement.js';
 import { pools } from '../entities/pools.js';
 import { solidObstacles } from '../world/level.js';
 import { sound } from '../audio/sound-system.js';
@@ -58,14 +59,14 @@ export function updateProjectiles(dt) {
       len = Math.hypot(...movement),
       dir = vmul(movement, 1 / len);
     if (p.friendly) {
-      const hit = trace(p.p, dir, len + 0.5, false);
+      const hit = trace(p.p, dir, len + 0.5, false, true);
       if (hit.entity) {
         applyDamage(hit.entity, p.damage, hit.component);
         if (p.type === 'cannon' || p.shotCount) G.shotsHit++;
         p.hit = true;
         burst(hit.point, p.color, p.type === 'missile' ? 14 : 9, p.type === 'missile' ? 10 : 6);
         sound.fxPlay('hit', clamp(1 - dist2(G.player, hit.entity) / 950, 0.03, 0.35));
-      } else if (hit.distance < len - 0.5) {
+      } else if (hit.distance < len) {
         p.hit = true;
         burst(hit.point, p.color, 8, 5);
       }
@@ -77,7 +78,7 @@ export function updateProjectiles(dt) {
       if (t !== Infinity) {
         p.hit = true;
         damagePlayer(p.damage, p);
-      } else if (coverDistance(p.p, dir, len) < len - 0.5) {
+      } else if (coverDistance(p.p, dir, len, true) < len) {
         p.hit = true;
         burst(p.p, p.color, 7, 4);
       }
@@ -146,37 +147,29 @@ export function updatePlayer(dt) {
     -dt * chassisData().brake,
     dt * chassisData().accel,
   );
+  // A mech stands on exactly the footprint that would block it at that height; see
+  // structureHeight() in movement.js for what went wrong when the two differed.
+  const reach = chassisData().radius;
   let support = 0;
   for (const o of solidObstacles)
-    if (Math.hypot(G.player.x - o.x, G.player.z - o.z) < o.r && G.player.altitude >= o.h - 0.5)
+    if (
+      Math.hypot(G.player.x - o.x, G.player.z - o.z) < o.r + reach &&
+      G.player.altitude >= o.h - 0.5
+    )
       support = Math.max(support, o.h);
   for (const e of pools.entities) {
     if (!e.alive || e.type === 'mech') continue;
-    const roof =
-        e.collisionHeight ??
-        (e.type === 'uplink'
-          ? 15
-          : e.type === 'tower'
-            ? 9
-            : e.type === 'reactor'
-              ? 45
-              : e.type === 'generator'
-                ? 9
-                : 5),
-      r =
-        e.collisionRadius ??
-        (e.type === 'uplink'
-          ? 23
-          : e.type === 'tower'
-            ? 12
-            : e.type === 'reactor'
-              ? 30
-              : e.type === 'generator'
-                ? 13
-                : 5);
-    if (dist2(G.player, e) < r && G.player.altitude >= roof - 0.5)
+    const roof = structureHeight(e);
+    if (dist2(G.player, e) < structureRadius(e) + reach && G.player.altitude >= roof - 0.5)
       support = Math.max(support, roof);
   }
+  if (
+    ridgeGateLocked() &&
+    Math.abs(G.player.z - ridgeGate.z) < 3 + reach &&
+    Math.abs(G.player.x - ridgeGate.x) < ridgeGate.width / 2 + reach &&
+    G.player.altitude >= ridgeGate.height - 0.5
+  )
+    support = Math.max(support, ridgeGate.height);
   G.player.grounded = G.player.altitude <= support + 0.05 && G.player.vy <= 0;
   const jet =
     (G.keys.ShiftLeft || G.keys.ShiftRight) &&
@@ -214,7 +207,10 @@ export function updatePlayer(dt) {
     G.player.altitude,
     chassisData().radius,
   );
-  if (!moved) G.player.speed *= 0.92;
+  // Bleed speed off against an obstacle at a rate per second — the rate one 60 Hz frame
+  // applied. Applied per step, it depended on the step length and so on refresh rate, and
+  // pushing into a wall settled faster or slower depending on the monitor.
+  if (!moved) G.player.speed *= Math.pow(0.92, dt * 60);
   G.player.phase += Math.abs(G.player.speed) * dt * 0.24;
   const step = Math.floor(G.player.phase / Math.PI);
   if (step !== G.player.legStep && G.player.grounded && Math.abs(G.player.speed) > 2) {

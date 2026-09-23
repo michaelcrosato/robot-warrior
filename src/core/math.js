@@ -278,3 +278,38 @@ export const M = {
     ]);
   },
 };
+
+/**
+ * Where a ray first meets an upright cylinder — the shape of every rock and building in
+ * the cover test — as a distance along the ray, or Infinity for a miss.
+ *
+ * The side is tested at the entry point only, against the cylinder's height; the caps are
+ * not modelled, which is fine for cover that stands on the ground.
+ *
+ * Two callers want different answers near the cylinder. A shooter's ray ignores anything
+ * closer than `minDistance` (one unit), so a muzzle pressed against a rock face does not
+ * block its own line of fire. A projectile's step must instead count cover from where it
+ * is, and must count the case where it is already inside: the entry point is then behind
+ * it, and rejecting that is how shots used to pass straight through rocks whenever the
+ * step was short, i.e. on high refresh-rate monitors.
+ *
+ * @param {number[]} origin
+ * @param {number[]} dir          unit direction
+ * @param {{x: number, z: number, r: number, h: number}} o   cylinder centre, radius, height
+ * @param {number} base           ground height under the cylinder
+ * @param {number} [minDistance]  entries closer than this are ignored
+ * @param {boolean} [fromInside]  an origin inside the cylinder counts as a hit at 0
+ */
+export function rayCylinder(origin, dir, o, base, minDistance = 1, fromInside = false) {
+  const ox = origin[0] - o.x,
+    oz = origin[2] - o.z,
+    c = ox * ox + oz * oz - o.r * o.r;
+  if (fromInside && c < 0 && origin[1] > base && origin[1] < base + o.h) return 0;
+  const b = ox * dir[0] + oz * dir[2],
+    a = dir[0] * dir[0] + dir[2] * dir[2],
+    disc = b * b - a * c;
+  if (disc <= 0 || a <= 0.00001) return Infinity;
+  const u = (-b - Math.sqrt(disc)) / a,
+    y = origin[1] + dir[1] * u;
+  return u > minDistance && y > base && y < base + o.h ? u : Infinity;
+}
