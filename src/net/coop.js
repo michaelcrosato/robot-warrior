@@ -4,10 +4,16 @@
 import { $, hideOverlays } from '../core/dom.js';
 import {
   COOP_COLORS,
+  COOP_INPUT_BUFFER,
   COOP_KEYS,
   COOP_PROTOCOL,
+  COOP_RESTORE_RANGE,
   COOP_STEP,
+  coopChassis,
   coopCopy,
+  coopDifficulty,
+  coopLoadout,
+  coopMember,
   coopName,
   coopNumber,
 } from './protocol.js';
@@ -168,7 +174,7 @@ export class LanceCoop {
         this.copy(
           'RobotWarrior co-op room: ' +
             this.formattedRoom() +
-            '. Open RobotWarrior_Coop.html, select ONLINE CO-OP, then JOIN.',
+            '. Open RobotWarrior, select ONLINE CO-OP, then JOIN.',
         );
     });
     $('coopReady').addEventListener('click', () => this.ready());
@@ -263,8 +269,8 @@ export class LanceCoop {
   profile() {
     return {
       name: coopName($('coopName').value),
-      chassis: chassisSpecs[$('coopChassis').value] ? $('coopChassis').value : 'warden',
-      loadout: config[$('coopLoadout').value] ? $('coopLoadout').value : 'balanced',
+      chassis: coopChassis($('coopChassis').value),
+      loadout: coopLoadout($('coopLoadout').value),
     };
   }
   changeProfile() {
@@ -566,8 +572,8 @@ export class LanceCoop {
         id: link.id,
         slot,
         name: coopName(m.name),
-        chassis: chassisSpecs[m.chassis] ? m.chassis : 'warden',
-        loadout: config[m.loadout] ? m.loadout : 'balanced',
+        chassis: coopChassis(m.chassis),
+        loadout: coopLoadout(m.loadout),
         ready: false,
         bootReady: false,
         queue: [],
@@ -588,8 +594,8 @@ export class LanceCoop {
     if (m.t === 'profile' && !this.active) {
       Object.assign(r, {
         name: coopName(m.name),
-        chassis: chassisSpecs[m.chassis] ? m.chassis : r.chassis,
-        loadout: config[m.loadout] ? m.loadout : r.loadout,
+        chassis: coopChassis(m.chassis, r.chassis),
+        loadout: coopLoadout(m.loadout, r.loadout),
         ready: false,
       });
       this.lobbyBroadcast();
@@ -641,8 +647,8 @@ export class LanceCoop {
         return;
       this.mode = 'guest';
       this.connecting = false;
-      this.members = new Map(m.members.map((r) => [r.id, r]));
-      G.difficulty = m.difficulty;
+      this.members = new Map(m.members.map((r) => [r.id, coopMember(r)]));
+      G.difficulty = coopDifficulty(m.difficulty);
       $('coopDifficulty').value = G.difficulty;
       this.message('Connected. Select READY when your mech is set.');
       this.paint();
@@ -824,12 +830,12 @@ export class LanceCoop {
     this.session = packet.session;
     this.sessionStarted = true;
     this.crewSize = packet.members.length;
-    G.difficulty = packet.difficulty;
+    G.difficulty = coopDifficulty(packet.difficulty);
     this.members = new Map(
       packet.members.map((r) => [
         r.id,
         {
-          ...r,
+          ...coopMember(r),
           ready: true,
           bootReady: false,
           queue: [],
@@ -892,7 +898,9 @@ export class LanceCoop {
       'insertion',
       10,
     );
-    if (!document.pointerLockElement) toast('Click the cockpit to capture the mouse. [H] Help.', 5);
+    // Touch pilots never capture the mouse; the prompt only told them to do the impossible.
+    if (!G.touchMode && !document.pointerLockElement)
+      toast('Click the cockpit to capture the mouse. [H] Help.', 5);
   }
   boot(dt) {
     if (this.held) return;
@@ -1002,7 +1010,14 @@ export class LanceCoop {
     this.stepInput(local, input);
     for (const r of this.members.values())
       if (r.id !== this.id) {
-        r.credit = Math.min(0.35, r.credit + dt);
+        // A backlog beyond a small jitter buffer means the host lost time — a stall longer
+        // than the 0.2 s frame clamp — while the guest kept sending. Earning one step of
+        // credit per step could never drain it, so it grew until the guest was dropped at
+        // 120 queued inputs. Double credit while behind replays the missed inputs at up to
+        // twice real time, which only moves the host's copy of that pilot toward where the
+        // guest already predicted it to be.
+        const behind = r.queue.length > COOP_INPUT_BUFFER;
+        r.credit = Math.min(0.35, r.credit + (behind ? dt * 2 : dt));
         let steps = 0;
         while (r.queue.length && r.credit >= COOP_STEP - 0.000001 && steps++ < 8) {
           const next = r.queue.shift();
@@ -1099,7 +1114,7 @@ export class LanceCoop {
         return (
           r.id !== fallen.id &&
           r.intent?.keys.KeyJ &&
-          dist2(q, p) < 32 &&
+          dist2(q, p) < COOP_RESTORE_RANGE &&
           q.altitude < 3 &&
           Math.abs(q.speed) < 2.2 &&
           q.shutdown <= 0
@@ -1471,7 +1486,15 @@ export class LanceCoop {
     }
   }
   disconnected(id, wasOpen) {
-    if (this.suppressClose || this.mode === 'offline') return;
+    if (this.suppressClose) return;
+    if (this.mode === 'offline') {
+      // A guest whose data link to the host closes during the handshake, before the first
+      // lobby message: nothing else resets `connecting`, and connect() refuses while it is
+      // set, so the panel stayed on CONNECTING until the page was reloaded.
+      if (this.connecting && this.transport && this.id !== this.hostId && id === this.hostId)
+        this.connectionError('The host closed the connection before the lobby opened.');
+      return;
+    }
     if (this.host) {
       const r = this.members.get(id);
       if (!r) return;
@@ -1511,6 +1534,11 @@ export class LanceCoop {
     this.history = [];
     this.actions = [];
     this.room = '';
+    // The host's difficulty applied to the session only. Solo play goes back to the one the
+    // menu shows as selected.
+    G.difficulty = coopDifficulty(
+      document.querySelector('[data-difficulty].active')?.getAttribute('data-difficulty'),
+    );
     this.held = false;
     this.localMenu = false;
     this.suppressClose = false;

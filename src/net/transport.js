@@ -15,6 +15,21 @@
  * @property {(peer: string, wasOpen: boolean) => void} [onClose] a peer went away
  */
 
+/**
+ * Apply one remote ICE candidate. A peer can send one this browser rejects — a malformed
+ * string, or a candidate for a transport it does not support — and that must cost only
+ * that candidate: an exception here used to abort the whole offer before the answer was
+ * sent. The connection succeeds or fails on the candidates that remain.
+ *
+ * @param {RTCPeerConnection} pc
+ * @param {RTCIceCandidateInit} candidate
+ */
+async function addCandidate(pc, candidate) {
+  try {
+    await pc.addIceCandidate(candidate);
+  } catch (_) {}
+}
+
 export class LanceTransport {
   /** @type {string} */ id;
   /** @type {string} */ signal;
@@ -214,9 +229,12 @@ export class LanceTransport {
       }
       link = this.makeLink(m.src, p.connectionId);
       await link.pc.setRemoteDescription(p.sdp);
-      const waiting = this.pendingICE.get(m.src) || [];
+      // Candidates can arrive before the link exists (pendingICE) or while the remote
+      // description above is still being applied (link.ice). Only the first list used to be
+      // drained here, so the second was silently lost on the answering side.
+      const waiting = [...(this.pendingICE.get(m.src) || []), ...link.ice.splice(0)];
       this.pendingICE.delete(m.src);
-      for (const c of waiting) await link.pc.addIceCandidate(c);
+      for (const c of waiting) await addCandidate(link.pc, c);
       await link.pc.setLocalDescription(await link.pc.createAnswer());
       this.sendSignal({
         type: 'ANSWER',
@@ -230,7 +248,7 @@ export class LanceTransport {
     } else if (m.type === 'ANSWER' && link) {
       if (link.connectionId !== p.connectionId) return;
       await link.pc.setRemoteDescription(p.sdp);
-      for (const c of link.ice.splice(0)) await link.pc.addIceCandidate(c);
+      for (const c of link.ice.splice(0)) await addCandidate(link.pc, c);
     } else if (m.type === 'CANDIDATE' && p.candidate) {
       if (!link) {
         if (this.pendingICE.size > 6) return;
@@ -238,7 +256,7 @@ export class LanceTransport {
         if (queue.length < 32) queue.push(p.candidate);
         this.pendingICE.set(m.src, queue);
       } else if (link.connectionId === p.connectionId) {
-        if (link.pc.remoteDescription) await link.pc.addIceCandidate(p.candidate);
+        if (link.pc.remoteDescription) await addCandidate(link.pc, p.candidate);
         else if (link.ice.length < 32) link.ice.push(p.candidate);
       }
     }
