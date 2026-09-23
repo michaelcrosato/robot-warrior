@@ -33,6 +33,11 @@ The project is connected to `michaelcrosato/robot-warrior` through Vercel's GitH
 integration, with `main` as the production branch. Pushing to `main` deploys to
 production; a pull request gets a preview deployment.
 
+Vercel builds as soon as a commit lands and does not wait for CI. Gating production on CI
+is a dashboard setting (Project Settings → Deployment Checks), not something
+`vercel.json` can express; until it is on, Vercel production can briefly serve a commit
+whose CI later fails. GitHub Pages does wait — see below.
+
 Build settings live in `vercel.json` rather than in the dashboard, so they are
 version-controlled and reviewable:
 
@@ -55,12 +60,16 @@ changes upstream should not silently change how this project builds.
 - Everything — `nosniff`, a conservative `Referrer-Policy`, and a `Permissions-Policy`
   denying camera, microphone, geolocation, payment and USB. The game uses none of them,
   including in co-op: WebRTC data channels need no media permissions.
+- Everything — a narrow `Content-Security-Policy`:
+  `script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'`.
 
-**There is deliberately no Content-Security-Policy.** Co-op connects to a signalling
-server the player can change in the lobby, and to whatever STUN/TURN hosts that returns.
-A policy strict enough to be worth having would break online play, and a policy loose
-enough not to would not be worth having. For a static site with no backend and no
-third-party scripts, the useful headers are the ones above.
+The policy restricts where code comes from, not where the game connects. Co-op talks to a
+signalling server the player can change in the lobby and to STUN/TURN hosts — Google's
+STUN, PeerJS's public TURN, and one the player may add — so `connect-src` is left open;
+restricting it would break online play. What the policy does buy is that no injected or
+third-party script can run, no plugin content can load, a `<base>` tag cannot redirect
+the bundle, and the page cannot be framed. The build has no inline scripts and no
+`eval`, which is what makes `script-src 'self'` possible.
 
 ### Working with it locally
 
@@ -68,8 +77,14 @@ third-party scripts, the useful headers are the ones above.
 vercel link                                  # once, connects this directory
 vercel pull --yes --environment production   # fetch project settings
 vercel build --yes --target production       # reproduce the real build locally
-vercel deploy --prebuilt                     # deploy that exact output
 ```
+
+**Do not `vercel deploy --prebuilt` from a working copy that has the soundtrack.** Vite
+copies everything under `assets/` into the build, so `.vercel/output/` then contains the
+three copyrighted tracks, and a prebuilt deploy uploads exactly that output — the licence
+guard in CI only inspects git. Deploy by pushing to `main`: the Git integration builds
+from a clean clone, which has no music. `.vercelignore` keeps the tracks out of a plain
+`vercel deploy`, which uploads source, but it cannot help a prebuilt one.
 
 `vercel build` writes to `.vercel/output/`, which is gitignored — as is `.env.local`,
 which `vercel link` creates and which contains a short-lived OIDC token.
@@ -80,6 +95,11 @@ which `vercel link` creates and which contains a short-lived OIDC token.
 `dist/` through `actions/deploy-pages`. Pages is configured with `build_type: workflow`,
 so the workflow is the source of truth and there is no branch-based publishing to keep
 in sync.
+
+It runs when the CI workflow finishes on `main`, and deploys that exact commit only if
+CI passed; it can also be started by hand. It used to run on every push, in parallel with
+CI, so a commit went live whether or not its tests passed. The Pages and OIDC permissions
+belong to the deploy job alone, not to the build job that runs the toolchain.
 
 ## No music on either
 
@@ -92,9 +112,10 @@ This is expected and handled: the game plays normally with music silent. The end
 suite ignores 404s under `audio/music/` for exactly this reason, and asserts separately
 that every cue ends up either loaded or reported as unavailable.
 
-If you want music on your own deployment, put the files in `assets/audio/music/` before
+If you want music in your own copy, put the files in `assets/audio/music/` before
 building. They are gitignored, so that means building from a working copy that has them
-rather than from a fresh clone.
+rather than from a fresh clone — and it means that build must stay private: publishing the
+recordings is exactly what ADR 0003 exists to prevent.
 
 ## Local builds and browser checks
 
@@ -138,6 +159,7 @@ If boot fails:
 ## The offline build is not deployed anywhere
 
 `pnpm run build:single` produces `dist-single/RobotWarrior.html`, a self-contained
-file that runs from `file://` with every clip inlined as a data URL. It is built in CI to
-prove it still works, but it is never published — on a machine that has the soundtrack, it
+file that runs from `file://` with every clip inlined as a data URL. CI builds it and then
+opens it from `file://` (`scripts/check-single.mjs`) to prove it boots and deploys, but it
+is never published — on a machine that has the soundtrack, it
 would embed those recordings.

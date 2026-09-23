@@ -45,7 +45,10 @@ export default defineConfig({
   webServer: {
     command: 'pnpm exec vite preview --port 4180 --strictPort',
     url: 'http://127.0.0.1:4180',
-    reuseExistingServer: !process.env.CI,
+    // Never reuse a server already on the port. A leftover `vite preview` serves whatever
+    // it was started on, so reusing it ran the suite against a stale build and passed; the
+    // strict port now makes that a loud "port in use" failure instead.
+    reuseExistingServer: false,
     timeout: 60_000,
     stdout: 'ignore',
     stderr: 'pipe',

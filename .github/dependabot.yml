@@ -9,6 +9,10 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
+    # Let a release age three days before proposing it. Most malicious or broken releases
+    # are caught and pulled within that window; a dev-only toolchain loses nothing waiting.
+    cooldown:
+      default-days: 3
     commit-message:
       prefix: "chore"
       include: scope

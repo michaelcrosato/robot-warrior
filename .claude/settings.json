@@ -30,7 +30,10 @@
       "Bash(git add assets/audio/music/**)",
       "Bash(git add -f assets/audio/music/**)",
       "Bash(git add RobotWarrior.html)",
-      "Bash(git add -f RobotWarrior.html)"
+      "Bash(git add -f RobotWarrior.html)",
+      "Bash(pnpm baseline)",
+      "Bash(pnpm run baseline)",
+      "Bash(node scripts/capture-baseline.mjs)"
     ]
   }
 }
