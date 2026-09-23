@@ -6,7 +6,7 @@
  * unpacked build still produces the same world and the same reported state, which is
  * what makes the refactor verifiable rather than merely plausible.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures.js';
 import { readFileSync } from 'node:fs';
 import {
   probeBoot,
