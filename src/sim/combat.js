@@ -2,7 +2,20 @@
  * Weapons, ray tracing, damage resolution and destruction.
  */
 import { G, config, timers } from './state.js';
-import { M, clamp, dist2, dot, hex, norm, rand, random, vadd, vmul, vsub } from '../core/math.js';
+import {
+  M,
+  clamp,
+  dist2,
+  dot,
+  hex,
+  norm,
+  rand,
+  random,
+  rayCylinder,
+  vadd,
+  vmul,
+  vsub,
+} from '../core/math.js';
 import { actorMatrix, burst, center } from '../entities/draw.js';
 import { announce, endMission, spawnBeam, toast } from '../net/coop-bridge.js';
 import { beginRidgeTransit } from './update.js';
@@ -52,7 +65,20 @@ export function raySphere(origin, dir, c, r, max = 1e9) {
   return t >= 0 && t <= max ? t : Infinity;
 }
 
-export function coverDistance(origin, dir, max, exclude = null) {
+/**
+ * Distance along a ray to the first piece of cover — the locked ridge gate, a rock or
+ * building, or the ground — capped at `max`.
+ *
+ * With `projectile` set, the ray is one step of a projectile's flight rather than a shot
+ * from a shooter: cover counts from zero distance, and a step that starts inside cover is
+ * blocked at once. See rayCylinder() for why the two differ.
+ *
+ * @param {number[]} origin
+ * @param {number[]} dir     unit direction
+ * @param {number} max
+ * @param {boolean} [projectile]
+ */
+export function coverDistance(origin, dir, max, projectile = false) {
   let t = max;
   if (ridgeGateLocked() && Math.abs(dir[2]) > 0.00001) {
     const u = (ridgeGate.z - origin[2]) / dir[2],
@@ -69,17 +95,11 @@ export function coverDistance(origin, dir, max, exclude = null) {
       t = u;
   }
   for (const o of solidObstacles) {
-    const c = [o.x, terrainY(o.x, o.z) + o.h * 0.5, o.z];
-    const ox = origin[0] - o.x,
-      oz = origin[2] - o.z,
-      b = ox * dir[0] + oz * dir[2],
-      a = dir[0] * dir[0] + dir[2] * dir[2],
-      disc = b * b - a * (ox * ox + oz * oz - o.r * o.r);
-    if (disc > 0 && a > 0.00001) {
-      const u = (-b - Math.sqrt(disc)) / a,
-        yy = origin[1] + dir[1] * u;
-      if (u > 1 && u < t && yy > c[1] - o.h * 0.5 && yy < c[1] + o.h * 0.5) t = u;
-    }
+    // The ground under an obstacle never changes, and this loop runs for every obstacle on
+    // every projectile step, lock check and imaging trace, so it is worked out once.
+    const base = (o.base ??= terrainY(o.x, o.z)),
+      u = rayCylinder(origin, dir, o, base, projectile ? 0 : 1, projectile);
+    if (u < t) t = u;
   }
   for (let u = 8; u < t; u += 18) {
     const x = origin[0] + dir[0] * u,
@@ -99,8 +119,8 @@ export function clearLOS(a, b) {
   return coverDistance(a, vmul(dif, 1 / d), d) > d - 4;
 }
 
-export function trace(origin, dir, range, assist = true) {
-  let nearest = coverDistance(origin, dir, range),
+export function trace(origin, dir, range, assist = true, projectile = false) {
+  let nearest = coverDistance(origin, dir, range, projectile),
     hit = null,
     component = 'core';
   for (const e of pools.entities) {

@@ -9,6 +9,37 @@ import { ridgeGateLocked } from '../entities/spawn.js';
 import { solidObstacles } from '../world/level.js';
 import { terrainY } from '../world/terrain.js';
 
+/*
+ * A structure's footprint and height do two jobs: they block a mech walking into it, and
+ * they are the roof a mech lands on when it comes down from above. Both jobs read the same
+ * two functions on purpose. Landing used to have its own, smaller table — relay tower and
+ * power feeds 9 high, uplink 15, each on a narrower footprint than the one that blocked —
+ * so a pilot who jetted onto a roof settled inside the blocking volume and every move was
+ * refused. Walking off the edge had the same trap: the mech dropped into the ring between
+ * the two footprints and was stuck at ground level.
+ */
+
+/** @param {{type: string, collisionHeight?: number}} e */
+export function structureHeight(e) {
+  return e.collisionHeight ?? (e.type === 'turret' ? 5 : e.type === 'reactor' ? 45 : 16);
+}
+
+/** @param {{type: string, collisionRadius?: number}} e */
+export function structureRadius(e) {
+  return (
+    e.collisionRadius ??
+    (e.type === 'uplink'
+      ? 29
+      : e.type === 'tower'
+        ? 17
+        : e.type === 'reactor'
+          ? 33
+          : e.type === 'generator'
+            ? 17
+            : 6)
+  );
+}
+
 export function collides(x, z, alt = 0, radius = 5) {
   if (
     typeof G.missionFlags !== 'undefined' &&
@@ -23,21 +54,7 @@ export function collides(x, z, alt = 0, radius = 5) {
   }
   for (const e of pools.entities) {
     if (!e.alive || e.type === 'mech') continue;
-    if (
-      alt < (e.collisionHeight ?? (e.type === 'turret' ? 5 : e.type === 'reactor' ? 45 : 16)) &&
-      Math.hypot(x - e.x, z - e.z) <
-        (e.collisionRadius ??
-          (e.type === 'uplink'
-            ? 29
-            : e.type === 'tower'
-              ? 17
-              : e.type === 'reactor'
-                ? 33
-                : e.type === 'generator'
-                  ? 17
-                  : 6)) +
-          radius
-    )
+    if (alt < structureHeight(e) && Math.hypot(x - e.x, z - e.z) < structureRadius(e) + radius)
       return true;
   }
   return false;
