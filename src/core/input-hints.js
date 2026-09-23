@@ -14,6 +14,8 @@ export function inputHint(text, touch) {
       'Drag MOVE to walk and turn. Release to stop.',
     ],
     ['PRESS X TO STOP', 'RELEASE MOVE TO STOP'],
+    ['Hold J to restore a downed teammate.', 'Stop near a downed teammate to restore them.'],
+    ['Hold J nearby to restore the mech.', 'Stop nearby to restore the mech.'],
   ])
     text = text.replace(keyboard, mobile);
   return text;

@@ -1,7 +1,7 @@
 /**
  * The seam between solo and co-op. Each function here dispatches to the co-op layer when a session is live and to the solo path otherwise.
  */
-import { COOP_COLORS } from './protocol.js';
+import { COOP_COLORS, COOP_RESTORE_RANGE } from './protocol.js';
 import { G } from '../sim/state.js';
 import { LanceCoop } from './coop.js';
 import { M, clamp, dist2, hex, norm, vadd, vmul, vsub, wrap } from '../core/math.js';
@@ -388,7 +388,7 @@ function drawCoopHUD() {
         yy = h * (0.39 + r.slot * 0.035);
       txt((side < 0 ? '‹ ' : '') + (r.slot + 1) + (side > 0 ? ' ›' : ''), xx, yy, 11, c, 'center');
     }
-    if (!p.alive && d < 38 && G.player.alive) {
+    if (!p.alive && d < COOP_RESTORE_RANGE && G.player.alive) {
       rect(w * 0.5 - 175 * s, h * 0.495, 350 * s, 36 * s, '#0b1d1fe8', c);
       txt(
         (G.touchMode ? 'STOP TO RESTORE / ' : 'STOP + HOLD [J] / RESTORE ') + r.name,

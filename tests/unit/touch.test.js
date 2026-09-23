@@ -14,6 +14,13 @@ describe('mobile control rules', () => {
     expect(inputHint(received, true)).toContain('Hold FIRE and drag');
     expect(inputHint('TRANSFER / PRESS X TO STOP', true)).toBe('TRANSFER / RELEASE MOVE TO STOP');
     expect(inputHint('CONTROL / Uplink is down.', true)).toBe('CONTROL / Uplink is down.');
+    // Co-op restoration is automatic on touch; the keyboard wording asked for a J key.
+    const down = 'LANCE / ACE is down. Hold J nearby to restore the mech.';
+    expect(inputHint(down, true)).toBe('LANCE / ACE is down. Stop nearby to restore the mech.');
+    expect(inputHint(down, false)).toBe(down);
+    expect(
+      inputHint('LANCE CONTROL / Stay together. Hold J to restore a downed teammate.', true),
+    ).toBe('LANCE CONTROL / Stay together. Stop near a downed teammate to restore them.');
   });
   it('requests co-op restoration only while alive, grounded and stopped', () => {
     const pilot = { alive: true, altitude: 0, speed: 0, shutdown: 0 };
