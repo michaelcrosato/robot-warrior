@@ -29,8 +29,9 @@ infringement regardless of intent, and git history is permanent once pushed, so 
 have been kept out from the first commit rather than removed later.
 
 **The game is fully playable without them.** Mission music is silent; every other
-sound — weapons, warnings, radio speech, the cockpit — is unaffected. A missing track
-is logged once at `console.info` and never as an error.
+sound — weapons, warnings, radio speech, the cockpit — is unaffected. The game logs a
+missing track once at `console.info` and never as an error; the browser's own network log
+still shows a 404 for each, which is expected.
 
 ## Adding your own music
 
@@ -42,7 +43,8 @@ assets/audio/music/basin.mp3    Kestrel Basin, loops
 assets/audio/music/works.mp3    Ashfall Works and Blackglass Ridge, loops
 ```
 
-Anything the browser can decode works — MP3 is what the manifest expects by default.
+The names must be exactly these, `.mp3` included: the manifest and `pnpm assets:check`
+look for them. The contents need only be something the browser can decode.
 The directory is gitignored, so your files stay local.
 
 Titles and expected durations live in `SOUNDTRACK_INFO` in
@@ -63,7 +65,8 @@ Keep an original copy only if you need to re-extract its assets or recapture its
 historical behaviour; current offline builds come from `pnpm build:single`.
 
 If you have the original 13 MB `RobotWarrior.html`, the extractor pulls every clip out
-of it and regenerates the manifest:
+of it and regenerates the manifest. (The maintainer's own copy was deleted in September
+2026, so this now needs a copy from elsewhere; so does `pnpm baseline`.)
 
 ```bash
 node scripts/extract-assets.mjs --source path/to/RobotWarrior.html

@@ -17,8 +17,9 @@ has to be written down rather than held in someone's head.
 assets:check → format:check → lint → typecheck → test → build → test:e2e
 ```
 
-It takes about a minute. Do not report a change as done, fixed or passing without
-reading its output. If you changed one file and want a faster loop, run the individual
+The unit tests take under a second; the end-to-end suite renders in software, so it takes
+several minutes locally and 15–20 in CI. Run it anyway. Do not report a change as done,
+fixed or passing without reading its output. If you changed one file and want a faster loop, run the individual
 scripts — but the gate is what decides.
 
 ## Setup
@@ -29,7 +30,7 @@ pnpm exec playwright install chromium    # once; the e2e suite needs a real brow
 pnpm dev                                 # http://127.0.0.1:5180
 ```
 
-Node 22 or newer. There is no mission music on a fresh clone and that is correct — see
+Node 22.13 or newer, or 24 (CI's version; Vitest does not support 25). There is no mission music on a fresh clone and that is correct — see
 [docs/assets.md](docs/assets.md).
 
 ## Scripts
@@ -38,16 +39,19 @@ Node 22 or newer. There is no mission music on a fresh clone and that is correct
 | ------------------------ | -------------------------------------------------------- |
 | `pnpm verify`            | The full gate. This is the one that matters.             |
 | `pnpm dev`               | Dev server with hot reload on 127.0.0.1:5180             |
+| `pnpm preview`           | Serve `dist/` on 127.0.0.1:4180                          |
 | `pnpm build`             | Production build to `dist/`                              |
 | `pnpm build:single`      | Offline single-file build to `dist-single/` (gitignored) |
 | `pnpm test`              | Unit tests (Vitest, Node) — fast                         |
 | `pnpm test:watch`        | Unit tests in watch mode                                 |
+| `pnpm test:coverage`     | Unit tests with coverage — what CI runs                  |
 | `pnpm test:e2e`          | Builds, then drives the real game in headless Chromium   |
 | `pnpm lint` / `lint:fix` | ESLint                                                   |
-| `pnpm format`            | Prettier, writes                                         |
+| `pnpm format`            | Prettier, writes (`format:check` only checks)            |
 | `pnpm typecheck`         | `tsc --noEmit` over JSDoc-typed JavaScript               |
 | `pnpm assets:check`      | Manifest vs. disk                                        |
 | `pnpm assets:extract`    | Re-extract audio from an original build                  |
+| `pnpm baseline`          | **Do not run** — regenerates the parity baseline         |
 
 ## Read these before changing code
 
@@ -123,16 +127,24 @@ decision, not a convenience.
 ## Tests
 
 Unit tests (`tests/unit/`) run in Node and cover the layers that are pure: maths,
-geometry, terrain, map data. If you are adding logic that could live in a pure function,
-put it in one and test it.
+geometry, cover intersection, terrain, map data, shader source, device detection, touch
+maths, settings validation and the co-op protocol's validators. If you are adding logic
+that could live in a pure function, put it in one and test it.
 
 The end-to-end suite (`tests/e2e/`) drives the real built game in Chromium through the
 `window.RobotWarrior` status API. Everything that owns WebGL, canvas, audio or socket
-state is covered there or not at all.
+state is covered there or not at all. It will not reuse a server already on port 4180: if
+it fails with "port in use", something is still serving there — stop it rather than work
+around it, because a stale server serves a stale build.
+
+For a one-off check the status API cannot reach, run `pnpm dev` and have the page
+`import('/src/…')`: under the dev server that returns the very module instances the game
+is using, so a probe can set up an exact situation — a mech on a roof, a shell aimed at a
+rock — and step the real code. It cannot work against a production build.
 
 When a test encodes behaviour that is imperfect rather than intended, say so in the
-test. `tests/unit/geometry.test.js` has two examples — an unlit sphere pole and a
-`clamp` edge case — and both comments explain why the behaviour stands.
+test. `tests/unit/math.test.js` has an example — `clamp` with its bounds reversed — and the
+comment explains why the behaviour stands.
 
 ## Commits and pull requests
 
