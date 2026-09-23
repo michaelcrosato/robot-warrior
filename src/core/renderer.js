@@ -7,7 +7,7 @@
  * `pass.mode`. Callers draw the world once and the renderer replays it per cascade.
  */
 import { G } from '../sim/state.js';
-import { M, dot, hex, norm } from './math.js';
+import { M, dot, hex } from './math.js';
 import { camera } from './viewport.js';
 import { geo, upload } from './mesh.js';
 import { gl } from './gl.js';
@@ -151,7 +151,7 @@ export function draw(g, m, color = [1, 1, 1], alpha = 1, glow = 0) {
   }
 
   gl.uniformMatrix4fv(scenePrg.uModel, false, m);
-  normalMatrix.set(M.normalMatrix(m));
+  M.normalMatrix(m, normalMatrix);
   gl.uniformMatrix3fv(scenePrg.uNormalMatrix, false, normalMatrix);
   gl.uniform3fv(scenePrg.uColor, color);
   gl.uniform1f(scenePrg.uAlpha, alpha);
@@ -190,11 +190,15 @@ export function drawPart(p, parent) {
 export function bake(parts) {
   const data = [];
   for (const p of parts) {
+    // Normals take the inverse transpose, not the model matrix. Baked parts are drawn at
+    // unit scale, so the per-draw normal matrix never corrects them: on a non-uniformly
+    // scaled bevel, dish or cylinder the model matrix tipped normals by up to 60 degrees.
     const m = M.transform(p.p, p.s, p.r),
+      nm = M.normalMatrix(m),
       d = p.g.data;
     for (let i = 0; i < d.length; i += 9) {
       const v = M.point(m, d.slice(i, i + 3)),
-        n = norm(M.vector(m, d.slice(i + 3, i + 6)));
+        n = M.transformNormal(nm, d.slice(i + 3, i + 6));
       data.push(...v, ...n, d[i + 6] * p.c[0], d[i + 7] * p.c[1], d[i + 8] * p.c[2]);
     }
   }

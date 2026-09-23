@@ -20,7 +20,7 @@ in vec2 aPos;
 out vec2 vUV;
 void main() {
   vUV = aPos;
-  // Sits at the far plane so the depth buffer rejects nothing in front of it.
+  // Drawn first with depth testing off, so the scene simply draws over it.
   gl_Position = vec4(aPos, 0.999999, 1.0);
 }
 `;

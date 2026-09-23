@@ -225,3 +225,46 @@ describe('seeded generator', () => {
     for (const count of buckets) expect(count).toBeGreaterThan(9000);
   });
 });
+
+describe('normals under a transform', () => {
+  it('stay perpendicular to the surface however it is scaled and turned', () => {
+    // The visor bevel on a mech: squashed hard on one axis. With the model matrix, a 45
+    // degree bevel normal tipped toward the stretched axis by about 60 degrees; with the
+    // inverse transpose it stays perpendicular to the transformed surface.
+    for (const [scale, rot] of [
+      [
+        [4.15, 1.13, 0.3],
+        [0, 0, 0],
+      ],
+      [
+        [1, 16, 1],
+        [0.4, 0, 0.2],
+      ],
+      [
+        [20, 0.9, 0.9],
+        [0, 0, 0.38],
+      ],
+      [
+        [3, 3, 3],
+        [0.3, 1.1, 0],
+      ],
+    ]) {
+      const m = M.transform([1, 2, 3], scale, rot),
+        nm = M.normalMatrix(m);
+      const n = norm([0, 1, 1]),
+        tangent = [1, 0, 0],
+        bitangent = [0, 1, -1];
+      const tn = M.transformNormal(nm, n);
+      expect(Math.hypot(...tn)).toBeCloseTo(1, 6);
+      expect(dot(tn, norm(M.vector(m, tangent)))).toBeCloseTo(0, 6);
+      expect(dot(tn, norm(M.vector(m, bitangent)))).toBeCloseTo(0, 6);
+    }
+  });
+
+  it('writes into a caller-supplied matrix without allocating a new one', () => {
+    const m = M.transform([0, 0, 0], [2, 3, 4], [0.1, 0.2, 0.3]),
+      out = new Float32Array(9);
+    expect(M.normalMatrix(m, out)).toBe(out);
+    expect([...out]).toEqual([...M.normalMatrix(m)]);
+  });
+});

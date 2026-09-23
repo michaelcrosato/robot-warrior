@@ -28,7 +28,7 @@ import { classifyDevice } from './device.js';
  * @property {number}  shadowCascades   0 disables the shadow pass entirely
  * @property {number}  shadowSize       resolution of one cascade, square
  * @property {number}  shadowDistance   metres of shadow coverage from the camera
- * @property {number}  shadowTaps       PCF taps per axis: 1, 2 or 3
+ * @property {number}  shadowTaps       PCF kernel: 1 a single tap, 2 a 3x3, 3 a 5x5
  * @property {boolean} bloom
  * @property {number}  bloomLevels      mip levels in the bloom chain
  * @property {number}  bloomScale       bloom chain resolution relative to the scene

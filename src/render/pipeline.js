@@ -59,6 +59,9 @@ const TINT = [1.0, 0.985, 0.96];
 const VIGNETTE = 0.42;
 const GRAIN = 0.022;
 
+/** Scratch for the cascade matrices, uploaded as one uShadowMatrix[4] array. */
+const shadowMatrices = new Float32Array(64);
+
 const current = {
   /** @type {any} */ scene: null,
   /** @type {any[]} */ bloomChain: [],
@@ -197,13 +200,14 @@ function setSceneUniforms(tier, shadowInfo) {
   if (shadowInfo.count > 0 && current.shadow) {
     bindTexture(4, gl.TEXTURE_2D_ARRAY, current.shadow.tex);
     gl.uniform1i(scenePrg.uShadowMap, 4);
-    for (let i = 0; i < shadowInfo.count; i++) {
-      gl.uniformMatrix4fv(
-        gl.getUniformLocation(scenePrg.p, `uShadowMatrix[${i}]`),
-        false,
-        shadowInfo.matrices[i],
-      );
-    }
+    // One upload for the whole array, through the location the program already holds,
+    // instead of a string lookup per cascade per frame.
+    for (let i = 0; i < shadowInfo.count; i++) shadowMatrices.set(shadowInfo.matrices[i], i * 16);
+    gl.uniformMatrix4fv(
+      scenePrg.uShadowMatrix,
+      false,
+      shadowMatrices.subarray(0, shadowInfo.count * 16),
+    );
     gl.uniform4fv(scenePrg.uCascadeSplits, shadowInfo.splits);
     gl.uniform2f(scenePrg.uShadowTexel, 1 / current.shadow.size, 1 / current.shadow.size);
     gl.uniform4fv(scenePrg.uCascadeTexelWorld, shadowInfo.texelWorld);
@@ -311,8 +315,8 @@ function renderBloom(tier) {
  * on its own, but the bloom chain downsamples it into a growing block and the composite
  * turns that block black — so knowing *which* stage first holds one is the whole question.
  *
- * Reads back a downsampled grid rather than every pixel; a NaN that matters is never a
- * single isolated texel by the time it reaches the chain.
+ * Reads back every texel of the scene target and each bloom level. That is slow, which is
+ * why it is a diagnostic and never part of a frame.
  */
 export function scanTargets() {
   const report = [];
