@@ -56,31 +56,42 @@ async function fightFor(page, ms) {
   await page.waitForTimeout(ms);
 }
 
-/** Proportion of 8x8 blocks in the world canvas that are essentially black. */
+/**
+ * Proportion of 8x8 blocks in the world canvas that are essentially black.
+ *
+ * Read inside an animation frame: the canvas does not preserve its drawing buffer, so it
+ * is only defined between the game drawing a frame and the browser presenting it. The
+ * game's callback was queued a frame earlier than this one, so it has drawn by now.
+ */
 async function darkBlockFraction(page) {
-  return page.evaluate(() => {
-    const c = /** @type {HTMLCanvasElement} */ (document.getElementById('world'));
-    const gl = /** @type {WebGL2RenderingContext} */ (c.getContext('webgl2'));
-    const px = new Uint8Array(c.width * c.height * 4);
-    gl.readPixels(0, 0, c.width, c.height, gl.RGBA, gl.UNSIGNED_BYTE, px);
-    const B = 8;
-    let dark = 0;
-    let total = 0;
-    for (let by = 0; by + B <= c.height; by += B) {
-      for (let bx = 0; bx + B <= c.width; bx += B) {
-        let sum = 0;
-        for (let y = 0; y < B; y++) {
-          for (let x = 0; x < B; x++) {
-            const i = ((by + y) * c.width + (bx + x)) * 4;
-            sum += px[i] + px[i + 1] + px[i + 2];
+  return page.evaluate(
+    () =>
+      new Promise((resolve) =>
+        requestAnimationFrame(() => {
+          const c = /** @type {HTMLCanvasElement} */ (document.getElementById('world'));
+          const gl = /** @type {WebGL2RenderingContext} */ (c.getContext('webgl2'));
+          const px = new Uint8Array(c.width * c.height * 4);
+          gl.readPixels(0, 0, c.width, c.height, gl.RGBA, gl.UNSIGNED_BYTE, px);
+          const B = 8;
+          let dark = 0;
+          let total = 0;
+          for (let by = 0; by + B <= c.height; by += B) {
+            for (let bx = 0; bx + B <= c.width; bx += B) {
+              let sum = 0;
+              for (let y = 0; y < B; y++) {
+                for (let x = 0; x < B; x++) {
+                  const i = ((by + y) * c.width + (bx + x)) * 4;
+                  sum += px[i] + px[i + 1] + px[i + 2];
+                }
+              }
+              total++;
+              if (sum / (B * B * 3) < 4) dark++;
+            }
           }
-        }
-        total++;
-        if (sum / (B * B * 3) < 4) dark++;
-      }
-    }
-    return dark / total;
-  });
+          resolve(dark / total);
+        }),
+      ),
+  );
 }
 
 test.describe('render pipeline integrity', () => {

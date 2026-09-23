@@ -229,7 +229,19 @@ export const M = {
    * by the model matrix directly skews it — visible as lighting that slides across a leg
    * as it stretches. Computed per draw, which is cheap next to the draw call itself.
    */
-  normalMatrix: (m) => {
+  /**
+   * A surface normal carried through a transform: multiplied by a normal matrix from
+   * normalMatrix() and renormalised. The model matrix itself is wrong for this whenever the
+   * scale is not uniform — it tips a normal toward the stretched axis.
+   */
+  transformNormal: (nm, n) =>
+    norm([
+      nm[0] * n[0] + nm[3] * n[1] + nm[6] * n[2],
+      nm[1] * n[0] + nm[4] * n[1] + nm[7] * n[2],
+      nm[2] * n[0] + nm[5] * n[1] + nm[8] * n[2],
+    ]),
+  /** The inverse transpose of m's upper 3x3, column-major; written into `out` if given. */
+  normalMatrix: (m, out = new Float32Array(9)) => {
     const a = m[0],
       b = m[1],
       c = m[2];
@@ -240,10 +252,13 @@ export const M = {
       h = m[9],
       i = m[10];
     const det = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
-    if (!det) return new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
+    if (!det) {
+      out.set([1, 0, 0, 0, 1, 0, 0, 0, 1]);
+      return out;
+    }
     const k = 1 / det;
     // Cofactor matrix, already transposed twice — i.e. the inverse transpose.
-    return new Float32Array([
+    out.set([
       (e * i - f * h) * k,
       (f * g - d * i) * k,
       (d * h - e * g) * k,
@@ -254,6 +269,7 @@ export const M = {
       (c * d - a * f) * k,
       (a * e - b * d) * k,
     ]);
+    return out;
   },
 
   perspective: (fov, asp, near, far, offset = 0) => {

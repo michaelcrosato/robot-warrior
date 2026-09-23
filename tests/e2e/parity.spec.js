@@ -248,24 +248,30 @@ test.describe('unpacked build matches the original', () => {
     });
     expect(glError, 'the driver must report no GL error after a frame').toBe('NO_ERROR');
 
-    // The scene must actually have been drawn to, not just cleared.
-    const lit = await page.evaluate(() => {
-      const c = /** @type {HTMLCanvasElement} */ (document.getElementById('world'));
-      const gl = /** @type {WebGL2RenderingContext} */ (c.getContext('webgl2'));
-      const px = new Uint8Array(4 * 64);
-      gl.readPixels(
-        Math.floor(c.width / 2) - 8,
-        Math.floor(c.height / 2) - 8,
-        8,
-        8,
-        gl.RGBA,
-        gl.UNSIGNED_BYTE,
-        px,
-      );
-      let sum = 0;
-      for (let i = 0; i < px.length; i += 4) sum += px[i] + px[i + 1] + px[i + 2];
-      return sum;
-    });
+    // The scene must actually have been drawn to, not just cleared. Read inside an animation
+    // frame, right after the game has drawn: the canvas does not preserve its buffer.
+    const lit = await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => {
+            const c = /** @type {HTMLCanvasElement} */ (document.getElementById('world'));
+            const gl = /** @type {WebGL2RenderingContext} */ (c.getContext('webgl2'));
+            const px = new Uint8Array(4 * 64);
+            gl.readPixels(
+              Math.floor(c.width / 2) - 8,
+              Math.floor(c.height / 2) - 8,
+              8,
+              8,
+              gl.RGBA,
+              gl.UNSIGNED_BYTE,
+              px,
+            );
+            let sum = 0;
+            for (let i = 0; i < px.length; i += 4) sum += px[i] + px[i + 1] + px[i + 2];
+            resolve(sum);
+          }),
+        ),
+    );
     expect(lit, 'the centre of the world canvas must not be black').toBeGreaterThan(0);
 
     expect(errors).toEqual([]);

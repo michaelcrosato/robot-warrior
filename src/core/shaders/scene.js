@@ -215,7 +215,9 @@ void main() {
   // --- rim -------------------------------------------------------------------
   // Reads the silhouette of a machine against the sky. Subtle, and skipped on terrain.
   if (rimStrength > 0.0) {
-    float rim = pow(1.0 - NdotV, 3.5);
+    // NdotV can round to a hair above 1.0 on a face looking straight at the camera, and
+    // pow() of a negative base is undefined — NaN on most drivers.
+    float rim = pow(max(1.0 - NdotV, 0.0), 3.5);
     color += uSkyColor * rim * rimStrength;
   }
 

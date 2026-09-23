@@ -16,11 +16,14 @@ const COLOR_INTERNAL = hdrSupported ? gl.RGBA16F : gl.RGBA8;
 const COLOR_TYPE = hdrSupported ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE;
 
 /**
- * RGBA16F can always be *sampled* with linear filtering in WebGL 2, but on some drivers
- * only when OES_texture_float_linear is present. The bloom chain depends on bilinear
- * upsampling, so fall back to nearest rather than render something subtly wrong.
+ * Linear filtering for every colour target. RGBA16F is texture-filterable in core WebGL 2
+ * (it is in the ES 3.0 filterable table); OES_texture_float_linear governs 32-bit float
+ * textures, which nothing here uses. Keying this on that extension forced nearest
+ * sampling on devices without it — many mobile GPUs — which made the bloom chain's
+ * bilinear down- and upsampling blocky and starved FXAA of sub-texel taps, and it caught
+ * the RGBA8 occlusion targets too, since they share this default.
  */
-const COLOR_FILTER = !hdrSupported || caps.floatLinear ? gl.LINEAR : gl.NEAREST;
+const COLOR_FILTER = gl.LINEAR;
 
 /** @typedef {{fb: WebGLFramebuffer, tex: WebGLTexture, depth: WebGLTexture|null, w: number, h: number}} Target */
 

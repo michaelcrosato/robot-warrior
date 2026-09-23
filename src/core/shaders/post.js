@@ -314,9 +314,8 @@ void main() {
     color = mix(color, vec3(0.62, 0.06, 0.05), clamp(uDamage, 0.0, 0.75));
   }
 
-  // Vignette, aspect-corrected so it stays round on an ultrawide monitor and on a phone
-  // held either way up.
-  vec2 v = (vUV - 0.5) * vec2(1.0, 1.0);
+  // Vignette in UV space, so it follows the frame's shape: an ellipse on a wide screen.
+  vec2 v = vUV - 0.5;
   float vig = 1.0 - dot(v, v) * uVignette;
   color *= clamp(vig, 0.0, 1.0);
 

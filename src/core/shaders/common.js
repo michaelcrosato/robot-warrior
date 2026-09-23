@@ -18,6 +18,7 @@ precision highp float;
 precision highp int;
 precision highp sampler2DArrayShadow;
 precision highp sampler2DArray;
+precision highp sampler2D;
 `;
 
 /** Constants used across programs. */
@@ -153,11 +154,15 @@ float sampleCascade(vec3 worldPos, vec3 normal, int cascade, float NdotL) {
   int taps = int(uShadowTaps);
   if (taps <= 1) return texture(uShadowMap, vec4(proj.xy, float(cascade), reference));
 
+  // taps 2 is a 3x3 kernel and taps 3 a 5x5. Before, the skip compared against taps rather
+  // than the radius, so 2 and 3 both ran all 25 lookups: ultra's "wider" filter was the
+  // same as high's, and mobile paid for a filter it was never meant to have.
+  int radius = taps - 1;
   float sum = 0.0;
   float count = 0.0;
   for (int y = -2; y <= 2; y++) {
     for (int x = -2; x <= 2; x++) {
-      if (abs(x) > taps || abs(y) > taps) continue;
+      if (abs(x) > radius || abs(y) > radius) continue;
       vec2 o = vec2(float(x), float(y)) * uShadowTexel;
       sum += texture(uShadowMap, vec4(proj.xy + o, float(cascade), reference));
       count += 1.0;

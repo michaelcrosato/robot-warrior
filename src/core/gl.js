@@ -24,10 +24,16 @@ export const ctx = hud.getContext('2d');
 export const gl = world.getContext('webgl2', {
   antialias: false,
   alpha: false,
-  depth: true,
+  // Nothing depth-tests against the visible canvas — the scene has its own depth target
+  // and the composite that fills the canvas runs with depth testing off — so a default
+  // depth buffer is memory for nothing: about 33 MB at 4K.
+  depth: false,
   stencil: false,
   powerPreference: 'high-performance',
-  preserveDrawingBuffer: true,
+  // Off: keeping the drawing buffer costs a full-screen copy or a retained buffer every
+  // frame, which tile-based mobile GPUs feel most. Tests that read the canvas do it inside
+  // an animation frame, after the game has drawn and before the browser presents.
+  preserveDrawingBuffer: false,
   desynchronized: true,
 });
 
