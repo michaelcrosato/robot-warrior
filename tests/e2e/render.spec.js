@@ -16,7 +16,7 @@
  * rasteriser, which auto-detects to the cheapest tier and skips the entire post chain, so
  * these force a desktop tier.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures.js';
 import { waitForBoot, MISSION_START_TIMEOUT } from './helpers/probe.js';
 
 /**

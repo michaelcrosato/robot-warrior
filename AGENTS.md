@@ -95,6 +95,11 @@ recording of the original build's behaviour. Overwriting it with current behavio
 destroys the only evidence that a refactor preserved anything. If parity fails, the
 change is wrong until proven otherwise.
 
+**E2E specs import `test` and `expect` from `tests/e2e/fixtures.js`, not
+`@playwright/test`.** On Windows it fakes pointer lock, because Chromium's real one clips
+the developer's actual cursor to the headless viewport (`ClipCursor`) — never let a local
+Windows run engage real pointer lock.
+
 **`src/data/audio-manifest.js` is generated.** Edit `scripts/extract-assets.mjs` and
 re-run `pnpm assets:extract`.
 

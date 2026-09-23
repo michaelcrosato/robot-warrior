@@ -1,5 +1,5 @@
 /** Real browser touch input, hit-testing and visual evidence at both requested aspect ratios. */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures.js';
 import { waitForBoot, MISSION_START_TIMEOUT } from './helpers/probe.js';
 
 const orientations = [
