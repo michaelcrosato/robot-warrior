@@ -19,8 +19,10 @@ No engine. No framework. No runtime dependencies.
 ## Operation Iron Echo
 
 You pilot one of three machines across three linked sectors — **Kestrel Basin**,
-**Ashfall Works**, **Blackglass Ridge** — taking a relay, an uplink, a reactor and a
-flight beacon, then holding an extraction point until the transport lands.
+**Ashfall Works**, **Blackglass Ridge** — cutting a relay and an uplink, clearing the
+basin, forcing Needle Pass, destroying a reactor its power feeds shield, downing Skyguard,
+holding a flight-link ring through two assault waves, then holding an extraction point
+until the transport lands.
 
 |            | **KESTREL** KST—40     | **WARDEN** WRD—70    | **BASTION** BST—95       |
 | ---------- | ---------------------- | -------------------- | ------------------------ |
@@ -64,10 +66,17 @@ torso independently. Your speed stays where you set it.
 | `M` / `N`        | Tactical map / next waypoint      |
 | `J` (hold)       | Restore a downed teammate (co-op) |
 | `Esc` / `H`      | Pause / field manual              |
+| `Enter`          | Deploy, from the main menu        |
+| Mouse wheel      | Next / previous weapon            |
+| `P`              | Sound on / off                    |
+| `Alt` + `Enter`  | Full screen                       |
+
+If the browser does not grant mouse capture, drag with either button held to aim instead
+(the left button also fires).
 
 Hold the aim steady on a target to get missile lock. At 100% heat the reactor shuts down —
-press `G` before that happens. Stop inside a blue repair bay for six seconds to repair and
-rearm, once per bay.
+press `G` before that happens. Stop inside a blue repair bay for six seconds to restore
+part of your armour and rearm — once per bay, and each bay opens as the mission reaches it.
 
 ### On a phone
 
@@ -85,7 +94,7 @@ In co-op, stop near a downed teammate to restore them automatically.
 The mobile tests save screenshots of the menu, cockpit, systems, map, pause and gestures
 under `test-results/`, alongside assertions for touch target size, overlap and hit testing.
 
-Render quality is picked for your device and can be overridden in the mission screen.
+Render quality is picked for your device and can be overridden from the pause menu.
 
 ### Four-pilot co-op
 
@@ -101,7 +110,7 @@ pnpm install
 pnpm dev          # http://127.0.0.1:5180
 ```
 
-Node 22 or newer. For a self-contained file that opens straight from `file://` with no
+Node 22.13 or newer, or 24 — CI uses 24; Vitest does not support 25. For a self-contained file that opens straight from `file://` with no
 server at all:
 
 ```bash
@@ -135,14 +144,15 @@ src/
 ├── entities/    Object pools, mech models, spawners, per-entity drawing
 ├── audio/       Streaming soundtrack, procedural effects, radio speech
 ├── sim/         Mutable state, pilot, combat, movement, AI, mission logic
-├── render/      The world render pass
+├── render/      Render pipeline: shadows, scene, post, debug views
 ├── hud/         Cockpit frame, instruments, tactical map
 ├── ui/          Menu and settings wiring, input
-├── net/         Co-op lobby, lockstep simulation, WebRTC transports
+├── net/         Co-op lobby, host-authoritative simulation, WebRTC transports
 └── main.js      Boot order, and the read-only status API
 ```
 
-41 modules, ~9,400 lines, zero runtime dependencies. The shipped bundle is 160 kB.
+55 modules, about 13,000 lines, zero runtime dependencies. The shipped bundle is 216 kB
+(77 kB gzipped).
 
 [**docs/architecture.md**](docs/architecture.md) goes deeper — including a frank list of
 the parts that are still awkward.
@@ -180,8 +190,9 @@ checked on purpose rather than assumed.
 
 It also caught a real bug that would otherwise have shipped: the object now called
 `camera` was first called `view`, which silently captured an existing local of that name
-and crashed the first rendered frame. The tool now refuses any namespace name bound
-anywhere in the source.
+and crashed the first rendered frame. The unpacking tool was changed to refuse any
+namespace name bound anywhere in the source, and AGENTS.md carries the same rule for edits
+made by hand.
 
 The full reasoning, including what it cost, is in [docs/adr/](docs/adr/README.md).
 
@@ -194,14 +205,15 @@ pnpm verify
 ```
 
 One gate, the same order CI runs: assets → formatting → lint → typecheck → unit tests →
-build → end-to-end. About a minute.
+build → end-to-end. The unit tests take under a second. The end-to-end suite renders in
+software, so it takes several minutes locally and 15–20 in CI.
 
 |                     |                                           |
 | ------------------- | ----------------------------------------- |
 | `pnpm dev`          | Dev server, hot reload                    |
 | `pnpm build`        | Production build to `dist/`               |
 | `pnpm build:single` | Offline single-file build                 |
-| `pnpm test`         | 57 unit tests over the pure layers (Node) |
+| `pnpm test`         | Unit tests over the pure layers (Node)    |
 | `pnpm test:e2e`     | Drives the real game in headless Chromium |
 | `pnpm assets:check` | Audio manifest against disk               |
 

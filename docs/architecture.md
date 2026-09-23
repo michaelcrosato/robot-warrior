@@ -2,7 +2,7 @@
 
 RobotWarrior is a browser game with no engine and no runtime dependencies. It draws
 the world with raw WebGL, the HUD with a 2D canvas on top, and runs co-op over WebRTC
-data channels. Roughly 9,400 lines across 41 modules under `src/`.
+data channels. About 13,000 lines across 55 modules under `src/`.
 
 This document describes the shape of the code, and is honest about the parts that are
 awkward. If you are here to change something, read [Shared state](#shared-state) and
@@ -42,16 +42,16 @@ Rendering flows downward; nothing in a lower layer reaches up.
 
 | Directory       | Files | Lines | What lives there                                             |
 | --------------- | ----: | ----: | ------------------------------------------------------------ |
-| `src/core/`     |    11 |   747 | WebGL context, shaders, procedural geometry, draw path, math |
-| `src/world/`    |     3 |   451 | Terrain height field, static level geometry, map sites       |
+| `src/core/`     |    19 |  2901 | WebGL context, shaders, procedural geometry, draw path, math |
+| `src/world/`    |     3 |   464 | Terrain height field, static level geometry, map sites       |
 | `src/data/`     |     2 |   357 | Chassis specifications, generated audio manifest             |
 | `src/entities/` |     4 |   911 | Object pools, mech models, spawners, per-entity drawing      |
-| `src/audio/`    |     2 |   457 | Streaming soundtrack, procedural effects, radio speech       |
-| `src/sim/`      |     7 |  1629 | Mutable state, pilot, combat, movement, AI, mission logic    |
-| `src/render/`   |     1 |   383 | The world render pass                                        |
-| `src/hud/`      |     3 |  1357 | Cockpit frame, instruments, tactical map                     |
-| `src/ui/`       |     2 |   360 | Menu and settings wiring, input handling                     |
-| `src/net/`      |     4 |  2591 | Co-op lobby, lockstep simulation, WebRTC transports          |
+| `src/audio/`    |     2 |   467 | Streaming soundtrack, procedural effects, radio speech       |
+| `src/sim/`      |     7 |  1666 | Mutable state, pilot, combat, movement, AI, mission logic    |
+| `src/render/`   |     4 |  1092 | Render pipeline, world pass, shadow cascades, debug views    |
+| `src/hud/`      |     4 |  1380 | Cockpit frame, instruments, tactical map, mobile sight       |
+| `src/ui/`       |     4 |   905 | Menu and settings wiring, keyboard, mouse and touch input    |
+| `src/net/`      |     4 |  2692 | Co-op lobby, host-authoritative simulation, WebRTC transport |
 
 ## The frame pipeline
 
@@ -67,8 +67,8 @@ The renderer is WebGL 2 and runs five stages per frame:
    coordinates, so there is nothing to sample.
 3. **Ambient occlusion** from that depth buffer, blurred. Desktop tiers only.
 4. **Bloom**: threshold and downsample, then tent-filter back up.
-5. **Composite**: occlusion, bloom, ACES tone map, grade, vignette, grain, FXAA — one pass,
-   one full-resolution read of the scene target.
+5. **Composite**: occlusion, bloom, ACES tone map, grade, vignette, grain, FXAA — one pass.
+   With FXAA on, it samples the scene around each pixel rather than once.
 
 `renderWorld()` supplies two callbacks, `drawOpaqueWorld` and `drawTransparentWorld`,
 because the scene is traversed once per cascade as well as once for the camera. The opaque
@@ -76,8 +76,11 @@ callback must stay free of anything that is not geometry; the blend helpers it u
 no-ops during a cascade for exactly that reason.
 
 **Quality is one axis.** Five tiers — potato, low, mobile, high, ultra — change internal
-resolution, cascade count and which post passes run. Nothing else varies, so tiers differ in
-fidelity rather than content. `mobile` is tuned against a Galaxy S26 and `ultra` against an
+resolution, cascade count and which post passes run, and with them the shadow map size,
+distance and filter kernel, the ambient-occlusion sample count, bloom depth and FXAA. One
+setting reaches past fidelity: how far away machines are drawn, from 1,200 m on potato to
+2,200 m on ultra, so a low-tier pilot can see less of the battlefield. Potato also swaps
+shadow maps for blob shadows. `mobile` is tuned against a Galaxy S26 and `ultra` against an
 RTX 4070 SUPER; see [ADR 0006](adr/0006-webgl2-render-pipeline.md).
 
 **Debugging.** `?debug=shadow` renders the shadow term alone, `?debug=cascade` colours by
@@ -85,15 +88,16 @@ cascade, and there are normal, albedo and roughness views. They exist because a 
 fault renders as a plausible picture — a shadow lookup returning "lit" everywhere is
 indistinguishable from a scene with the sun somewhere else.
 
-`window.RobotWarrior.scanTargets()` reads every render target back and reports non-finite
-values per stage. It is far too slow for a frame and exists for one reason: **a single bad
+`window.RobotWarrior.scanTargets()` reads back every texel of the scene target and each
+bloom level and reports non-finite values per stage. It is far too slow for a frame and exists for one reason: **a single bad
 pixel in the HDR target is not a single bad pixel on screen.** The bloom prefilter reads a
 13-tap neighbourhood and each downsample level widens it again, so fifteen NaN pixels have
 been measured becoming three hundred thousand by the first mip and a black rectangle across
 the middle of the screen after the composite — roughly twenty thousand to one. Anything
 writing into the scene target has to be finite, and when it is not, the picture tells you
 nothing about where it came from. The prefilter now rejects non-finite input as a
-containment layer, and `tests/e2e/render.spec.js` checks every stage during combat.
+containment layer, and `tests/e2e/render.spec.js` checks the scene and every bloom level
+during combat.
 
 ## Input
 
@@ -169,17 +173,25 @@ that behaves differently in a session — `startMission`, `fireWeapon`, `announc
 to the co-op layer when a session is live and to the `solo*` implementation in
 `src/sim/` otherwise.
 
-The rest of the game calls the bridge and never checks whether co-op is active. That
-is the point: there is one place where the two modes diverge.
+Most of the game calls the bridge instead of checking whether co-op is active, and that
+is the point: one place where the two modes diverge. It is not the only place. A handful of
+sites still read `G.coop` directly — damage application, mission flags, the audio update,
+the result screen — so when solo and co-op disagree, look there as well as in the bridge.
 
 `initCoop()` also wraps the audio system's `tone`, `noise`, `say` and `fxPlay` so a
 replayed or remote-owned frame stays silent. Without that, reconciliation would
 retrigger every sound it replays.
 
-Co-op runs a lockstep simulation: the host advances authoritative frames, clients
-predict locally and reconcile against host snapshots. `src/net/coop.js` is the largest
-module in the codebase (~2,000 lines) and is the least covered by tests — it needs
-four live peers to exercise properly.
+Co-op is host-authoritative, not lockstep: the host never waits for inputs. It runs the
+whole simulation at a fixed 40 Hz, stepping each guest's queued inputs as they arrive, and
+sends a snapshot ten times a second. Each guest predicts only its own mech, replays its
+unacknowledged inputs on top of every snapshot, and eases everything else toward the
+latest one. Peers find each other through a PeerJS signalling server and then talk over
+one ordered, reliable WebRTC data channel.
+
+`src/net/coop.js` is the largest module in the codebase (about 1,600 lines) and the least
+covered by tests: its protocol validators have unit tests, the rest none. Two browser
+contexts are enough to exercise a real session — host and guest need not be four peers.
 
 ## Boot order
 
@@ -209,12 +221,16 @@ without reaching into modules. `tests/e2e/` is built entirely on it.
 `frame()` in `src/loop.js` runs once per animation frame:
 
 1. Compute `dt` and update the frame-rate average.
-2. Advance the simulation — pilot, projectiles, effects, enemies, mission objectives.
+2. Advance the simulation — pilot, projectiles, enemies, mission objectives — in equal
+   steps of at most 25 ms, so a slow frame is several short steps rather than one long
+   one. Particles, beams and the radio advance once per frame.
 3. Render the world pass: sky, terrain, baked scenery, structures, entities.
 4. Draw the HUD to the 2D canvas over it.
 
-Enhanced Imaging is a second render pass with a wireframe tint, which is why
-`pass.imagingPass` and `pass.wireTint` are shared rather than local.
+Enhanced Imaging is a mode of the same render pass rather than a second one: shadows and
+ambient occlusion are skipped, and each mesh is drawn as a dark fill plus its edges in the
+wire tint. The renderer reads that mode from `pass.imagingPass` and `pass.wireTint`,
+which is why they are shared rather than local.
 
 ## Deployment
 
@@ -236,7 +252,8 @@ production build, end-to-end suite.
 `tests/e2e/__baseline__/original.json`, a snapshot captured from the original single-file
 build. Specifically it asserts:
 
-- the full menu-time status block matches exactly (41 fields);
+- the menu-time status block matches exactly — every field the original reported, less
+  five that vary with wall-clock time (30 compared);
 - the mission roster matches — every machine, its type and its sector;
 - every **structure** sits at exactly the coordinates the original put it at, which is
   the part that catches drift in `sites.js`, `terrainY` or the spawners;
@@ -246,8 +263,10 @@ build. Specifically it asserts:
 - frames render, the HUD canvas is drawn to, mission time advances, the WebGL context is
   live.
 
-Regenerating the baseline needs the original file, which is untracked — see
-[docs/assets.md](assets.md).
+Regenerating the baseline needs the original file, which is untracked and no longer
+exists on the maintainer's machine — see [docs/assets.md](assets.md). The committed
+baseline is now the only record of how the original behaved, which is one more reason
+never to regenerate it to make a test pass.
 
 Types are checked with `tsc` in `checkJS` mode. There are no `.ts` files; types come
 from JSDoc, with ambient declarations in `src/types/globals.d.ts`.
@@ -256,10 +275,12 @@ from JSDoc, with ambient declarations in `src/types/globals.d.ts`.
 
 Recorded rather than hidden:
 
-- `src/net/coop.js` is too large and has no automated coverage.
-- `G` holds 46 fields and mixes mission progress, pilot state, input and UI flags.
-- `sphereGeom`'s top pole band renders unlit; see the test in
-  `tests/unit/geometry.test.js` for why it has not been worth fixing.
+- `src/net/coop.js` is too large, and only its protocol validators have tests.
+- `G` holds 47 fields and mixes mission progress, pilot state, input and UI flags.
+- A lost WebGL context is not recovered. Every program, mesh and baked buffer is created
+  once at startup, so the game pauses and asks for a reload.
+- Co-op snapshots have no size budget, and a frame over 64 KB drops the link rather than
+  being skipped. A four-pilot missile fight has not been measured against that limit.
 - Several modules import each other cyclically. This is safe as written — only
   function declarations cross the cycles, and none are called during module
   evaluation — but it is fragile. Calling an imported function at module top level in
