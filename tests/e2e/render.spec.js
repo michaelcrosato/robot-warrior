@@ -188,7 +188,12 @@ test.describe('render pipeline integrity', () => {
       );
       await fightFor(page, 1400);
 
+      // Without these the sweep could pass while checking nothing: an unknown tier name
+      // falls back to automatic detection, which on this software rasteriser picks the
+      // cheapest tier — no bloom chain, so scanTargets() has nothing but the scene to scan.
+      expect(await page.evaluate(() => window.RobotWarrior.getStatus().tier)).toBe(tier);
       const stages = await page.evaluate(() => window.RobotWarrior.scanTargets());
+      expect(stages.length, `${tier}: the scan must reach the bloom chain`).toBeGreaterThan(1);
       for (const stage of stages) {
         expect(stage.nan, `${tier}: ${stage.name} holds NaN`).toBe(0);
         expect(stage.inf, `${tier}: ${stage.name} holds infinities`).toBe(0);
