@@ -84,6 +84,12 @@ async function darkBlockFraction(page) {
 }
 
 test.describe('render pipeline integrity', () => {
+  // Measured on the GitHub runner (4 vCPU, SwiftShader). A mission start at a desktop tier
+  // takes 25 to 56 s, and every readback waits out whatever frame is queued: 0.5 s when
+  // none is, 7 to 10 s when one is. A passing sustained-fire run used 86 s of the default
+  // 90, so that default decided pass or fail by runner load rather than by the assertions.
+  test.describe.configure({ timeout: 180_000 });
+
   test('no stage holds a non-finite value during sustained fire', async ({ page }) => {
     await useTier(page, 'high');
     await fightFor(page, 600);
@@ -154,8 +160,9 @@ test.describe('render pipeline integrity', () => {
 
   test('every tier with a post chain renders cleanly', async ({ page }) => {
     // Four missions, each on a heavier tier than the last, all in software. The default
-    // per-test budget does not cover that.
-    test.setTimeout(240_000);
+    // per-test budget does not cover that; on the CI runner the four mission starts alone
+    // took 24, 40, 41 and 56 s, and the whole sweep 225 s of an earlier 240 s budget.
+    test.setTimeout(360_000);
 
     // The bloom chain differs by tier — its depth, and whether ambient occlusion runs at
     // all. A fault that only appears at one mip count would otherwise go unseen.

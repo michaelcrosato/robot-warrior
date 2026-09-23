@@ -18,7 +18,9 @@ jobs:
   verify:
     name: verify
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # A passing end-to-end suite alone takes 12 to 17 minutes here. The cap has to leave
+    # room for the one retry CI allows, or a slow test is cancelled instead of retried.
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v5
